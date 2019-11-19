@@ -21,7 +21,7 @@ public class Block {
         this.timestamp = System.currentTimeMillis();
         this.data = data;
         this.prevBlockHash = prevBlockHash;
-        new ProofOfWork(this, 18).run();
+        ProofOfWork.mine(this);
     }
 
     public byte[] getBytesExceptHash() throws Exception {

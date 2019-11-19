@@ -1,21 +1,14 @@
 import java.math.BigInteger;
 
 public class ProofOfWork {
-    int targetBits;
-    Block block;
-    BigInteger target = new BigInteger("1");
-
-    public ProofOfWork(Block block, int targetBits) {
-        this.targetBits = targetBits;
-        target = target.shiftLeft(256-targetBits);
-        this.block = block;
-    }
+    static final int targetBits = 18;
+    static final BigInteger target = new BigInteger("1").shiftLeft(256-targetBits);
 
     private static byte[] prepareData(Block block, int nonce) throws Exception{
         return Utils.bytesConcat(block.getBytesExceptHash(), new Integer(nonce).toString().getBytes());
     }
 
-    public void run() throws Exception {
+    public static void mine(Block block) throws Exception {
         System.out.println("Mining the block containg," + block.getData());
         byte[] hash = new byte[0];
         int nonce = 0;
@@ -35,7 +28,7 @@ public class ProofOfWork {
         System.out.println();System.out.println();
     }
 
-    public boolean validate() throws Exception {
+    public static boolean validate(Block block) throws Exception {
         BigInteger bihash = new BigInteger(1, block.getHash());
         byte[] data = prepareData(block, block.getNonce());
         byte[] hash = Utils.sha256(data);
