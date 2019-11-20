@@ -1,15 +1,15 @@
 import java.math.BigInteger;
 
 public class ProofOfWork {
-    static final int targetBits = 18;
+    static final int targetBits = 10;
     static final BigInteger target = new BigInteger("1").shiftLeft(256-targetBits);
 
-    private static byte[] prepareData(Block block, int nonce) throws Exception{
-        return Utils.bytesConcat(block.getBytesExceptHash(), new Integer(nonce).toString().getBytes());
+    private static byte[] prepareData(Block block, int nonce) {
+        return Utils.bytesConcat(block.getBytesExceptHash(), new Integer(targetBits).toString().getBytes(), new Integer(nonce).toString().getBytes());
     }
 
-    public static void mine(Block block) throws Exception {
-        System.out.println("Mining the block containg," + block.getData());
+    public static void mine(Block block) {
+        //System.out.println("Mining the block containg," + block.getData());
         byte[] hash = new byte[0];
         int nonce = 0;
 

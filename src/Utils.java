@@ -1,21 +1,31 @@
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class Utils {
-    public static byte[] sha256(byte[] msg) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
+    public static byte[] sha256(byte[] msg){
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
         md.update(msg);
 
         return md.digest();
     }
 
-    public static byte[] bytesConcat(byte[]... bytes) throws IOException {
+    public static byte[] bytesConcat(byte[]... bytes) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
         for(byte b[] : bytes ) {
-            outputStream.write(b);
+            try {
+                outputStream.write(b);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         return outputStream.toByteArray();
@@ -30,4 +40,21 @@ public class Utils {
 
         return sb.toString();
     }
+
+    public static byte[] toBytes(Object... o) {
+        ByteArrayOutputStream bos = null;
+        ObjectOutputStream oos = null;
+        try {
+            bos = new ByteArrayOutputStream();
+            oos = new ObjectOutputStream(bos);
+            oos.writeObject(o);
+            oos.flush();
+            oos.close();
+        } catch( Exception e) {
+            e.printStackTrace();
+        }
+
+        return bos.toByteArray();
+    }
+
 }
