@@ -1,5 +1,3 @@
-import javafx.util.Pair;
-
 import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -23,10 +21,12 @@ public class Blockchain {
         this.db = db;
         this.tip = genesisBlock.getHash();
     }
+
     public Blockchain(Db db) {
         this.db = db;
         this.tip = new byte[]{};
     }
+
 
     public void MineBlock(Transaction[] transactions) throws Exception{
         Db.Bucket bucket = db.getBucket("blocks");
@@ -38,13 +38,13 @@ public class Blockchain {
         this.tip = newBlock.getHash();
     }
 
-    public ArrayList<TxOutput> findUTXO(String address) {
+    public ArrayList<TxOutput> findUTXO(byte[] pubkeyHash) {
         ArrayList<TxOutput> UTXOs = new ArrayList();
-        ArrayList<Transaction> unspentTransactions = findUnspentTransactions(address);
+        ArrayList<Transaction> unspentTransactions = findUnspentTransactions(pubkeyHash);
 
         for(Transaction tx : unspentTransactions) {
             for( TxOutput out : tx.getVout()) {
-                if(out.canBelockedWith(address)) {
+                if(out.isLockedWithKey(pubkeyHash)) {
                     UTXOs.add(out);
                 }
             }
@@ -53,7 +53,7 @@ public class Blockchain {
         return UTXOs;
     }
 
-    public ArrayList<Transaction> findUnspentTransactions(String address) {
+    public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
         ArrayList<Transaction> unspentTxs = new ArrayList();
         HashMap<String, ArrayList<Integer>> spentTxOs = new HashMap();
         Iterator<Block> itr = this.iterator();
@@ -68,21 +68,21 @@ public class Blockchain {
                     TxOutput out = tx.getVout().get(i);
 
                     if(spentTxOs.get(txId) != null) {
-                        for (Integer spentOut : spentTxOs.get(txId)) {
-                            if(spentOut.equals(i)) {
+                        for (Integer spentOutIdx : spentTxOs.get(txId)) {
+                            if(spentOutIdx.equals(i)) {
                                 continue OutPuts;
                             }
                         }
                     }
 
-                    if(out.canBelockedWith(address)) {
+                    if(out.isLockedWithKey(pubKeysHash)) {
                         unspentTxs.add(tx);
                     }
                 }
 
                 if(tx.isCoinBase() == false) {
                     for(TxInput in : tx.getVin()) {
-                        if (in.canUnlockOutputWith(address)) {
+                        if (in.usesKey(pubKeysHash)) {
                             String inTxId = in.getTxId();
                             if(spentTxOs.get(inTxId) == null) spentTxOs.put(inTxId, new ArrayList<Integer>());
                             spentTxOs.get(inTxId).add(in.getvOut());
@@ -99,9 +99,9 @@ public class Blockchain {
         return unspentTxs;
     }
 
-    public Pair<Integer, HashMap<String, ArrayList<Integer>>> findSpendableOutputs(String address, int amount) {
+    public Pair<Integer, HashMap<String, ArrayList<Integer>>> findSpendableOutputs(byte[] pubkeyHash, int amount) {
         HashMap<String, ArrayList<Integer>> unspentOutputs = new HashMap();
-        ArrayList<Transaction> unspentTxs = findUnspentTransactions(address);
+        ArrayList<Transaction> unspentTxs = findUnspentTransactions(pubkeyHash);
         int accumulated = 0;
 
         Work:
@@ -110,7 +110,7 @@ public class Blockchain {
 
             for(int i=0; i<tx.getVout().size(); i++) {
                 TxOutput out = tx.getVout().get(i);
-                if(out.canBelockedWith(address) && accumulated < amount) {
+                if(out.isLockedWithKey(pubkeyHash) && accumulated < amount) {
                     accumulated += out.getValue();
                     if(unspentOutputs.get(txId) == null) unspentOutputs.put(txId, new ArrayList<Integer>());
                     unspentOutputs.get(txId).add(i);
@@ -125,11 +125,12 @@ public class Blockchain {
         return new Pair(accumulated, unspentOutputs);
     }
 
-    public Transaction newUTXOTransaction(String from, String to, int amount) throws Exception{
+    public Transaction newUTXOTransaction(Wallet from, String to, int amount) throws Exception{
         ArrayList<TxInput> inputs = new ArrayList();
         ArrayList<TxOutput> outputs = new ArrayList();
 
-        Pair<Integer, HashMap<String, ArrayList<Integer>>> spendableOutputs = findSpendableOutputs(from, amount);
+        byte[] pubkeyHash = Utils.ripemd160(Utils.sha256(from.getPublicKey().getEncoded()));
+        Pair<Integer, HashMap<String, ArrayList<Integer>>> spendableOutputs = findSpendableOutputs(pubkeyHash, amount);
         int acc = spendableOutputs.getKey();
         HashMap<String, ArrayList<Integer>> validOutputs = spendableOutputs.getValue();
 
@@ -143,14 +144,14 @@ public class Blockchain {
             ArrayList<Integer> outs = validOutputs.get(txid);
 
             for(int out : outs) {
-                TxInput input = new TxInput(txid, out, from);
+                TxInput input = new TxInput(txid, out, from.getPublicKey().getEncoded(), new byte[]{0});
                 inputs.add(input);
             }
         }
 
         outputs.add(new TxOutput(amount, to));
         if(acc > amount) {
-            outputs.add(new TxOutput(acc-amount, from));
+            outputs.add(new TxOutput(acc-amount, from.getAddress()));
         }
 
         Transaction tx = new Transaction(new byte[]{}, inputs, outputs);
