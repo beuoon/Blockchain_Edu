@@ -23,6 +23,10 @@ public class Blockchain {
         this.db = db;
         this.tip = genesisBlock.getHash();
     }
+    public Blockchain(Db db) {
+        this.db = db;
+        this.tip = new byte[]{};
+    }
 
     public void MineBlock(Transaction[] transactions) throws Exception{
         Db.Bucket bucket = db.getBucket("blocks");
