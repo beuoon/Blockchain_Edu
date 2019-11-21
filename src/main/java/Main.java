@@ -31,5 +31,11 @@ public class Main {
         Functions.getBalance(address2, bc);
         Functions.getBalance(address3, bc);
 
+        Functions.send(wallets.getWallet(address1), address3, 30, bc);
+
+        Functions.getBalance(address1, bc);
+        Functions.getBalance(address2, bc);
+        Functions.getBalance(address3, bc);
+
     }
 }

@@ -18,18 +18,12 @@ public class TxInput implements Serializable {
     private byte[] pubKey;
     private byte[] signature;
 
+
     public TxInput(String txId, int vOut, byte[] pubKey, byte[] signature) {
         this.txId = txId;
         this.vOut = vOut;
         this.pubKey = pubKey;
         this.signature = signature;
-    }
-
-    public TxInput(TxInput txinput) {
-        this.txId = txinput.txId;
-        this.vOut = txinput.vOut;
-        this.pubKey = txinput.pubKey;
-        this.signature = txinput.signature;
     }
 
     public boolean usesKey(byte[] pubKeyHash) {

@@ -1,5 +1,5 @@
 import java.io.*;
-import java.security.PrivateKey;
+import java.security.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -24,17 +24,28 @@ public class Transaction implements Serializable {
         Vin.add(new TxInput("", -1, new byte[]{}, data.getBytes()));
         Vout.add(new TxOutput(subsidy, to));
 
-        this.setId();
+        setId(Hash());
     }
 
     public Transaction(byte[] id, ArrayList<TxInput> vin, ArrayList<TxOutput> vout) {
         this.id = id;
         this.Vin = vin;
         this.Vout = vout;
-        setId();
+        setId(Hash());
     }
 
-    public void sign(PrivateKey privateKey, HashMap<String, Transaction> prevTxs) {
+    public Transaction(Transaction tx) {
+        this.id = tx.id;
+        this.Vin = tx.Vin;
+        this.Vout = tx.Vout;
+    }
+
+    public byte[] Hash() {
+        return Utils.sha256(Utils.bytesConcat(Utils.toBytes(Vin), Utils.toBytes(Vout)));
+    }
+
+
+    public void sign(PrivateKey privateKey, HashMap<String, Transaction> prevTxs) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
         if(isCoinBase()) return;
 
         Transaction txCopy = trimmedCopy();
@@ -43,7 +54,14 @@ public class Transaction implements Serializable {
             Transaction prevTx = prevTxs.get(vin.getTxId());
             txCopy.getVin().get(i).setSignature(null);
             txCopy.getVin().get(i).setPubKey(prevTx.getVout().get(vin.getvOut()).getPublicKeyHash());
+            txCopy.setId(txCopy.Hash());
+            txCopy.getVin().get(i).setPubKey(null);
 
+            Signature ecdsa = Signature.getInstance("SHA1withECDSA");
+            ecdsa.initSign(privateKey);
+            ecdsa.update(txCopy.getId());
+            byte[] signature = ecdsa.sign();
+            Vin.get(i).setSignature(signature);
         }
     }
 
@@ -52,11 +70,11 @@ public class Transaction implements Serializable {
         ArrayList<TxOutput> outputs = new ArrayList<TxOutput>();
 
         for(TxInput vin : Vin) {
-            inputs.add(new TxInput(vin));
+            inputs.add(new TxInput(vin.getTxId(), vin.getvOut(), null, null));
         }
 
         for(TxOutput vout : Vout) {
-            outputs.add(vout);
+            outputs.add(new TxOutput(vout));
         }
 
         return new Transaction(id, inputs, outputs);
@@ -68,9 +86,8 @@ public class Transaction implements Serializable {
         return false;
     }
 
-    private void setId(){
-        byte[] b = Utils.toBytes(Vin, Vout);
-        id = Utils.sha256(b);
+    private void setId(byte[] id){
+        this.id = id;
     }
 
 
