@@ -22,7 +22,7 @@ public class Network {
         int connNum = rand.nextInt(MAX_CONNECT_NUM-MIN_CONNECT_NUM) + MIN_CONNECT_NUM;
         if (connNum > number) connNum = number;
 
-        HashSet<Integer> bUsePort = new HashSet();
+        HashSet<Integer> bUsePort = new HashSet<>();
         System.out.println(number + " 연결 !!");
 
         while(connNum > 0) {
@@ -64,10 +64,18 @@ public class Network {
     }
 
     public void close() {
-        this.server.close();
+        try {
+            server.close();
+            server.join();
+        } catch (InterruptedException ignored) {}
 
-        for (Client client : clients)
-            client.close();
+        for (int i = 0; i < clients.size(); i++) {
+            Client client = clients.get(i);
+            try {
+                client.close();
+                client.join();
+            } catch (InterruptedException ignored) {}
+        }
     }
 
     private class Server extends Thread {
@@ -92,10 +100,8 @@ public class Network {
 
         public void close() {
             try {
-                if (!this.socket.isClosed()) {
+                if (!this.socket.isClosed())
                     this.socket.close();
-                    System.out.println("서버 종료");
-                }
             } catch (IOException ignored) {}
         }
     }

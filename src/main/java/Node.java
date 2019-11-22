@@ -3,6 +3,9 @@ import event.MessageEventArgs;
 import network.Client;
 import network.Network;
 
+import java.util.ArrayList;
+import java.util.concurrent.Semaphore;
+
 public class Node extends Thread implements EventHandler<MessageEventArgs> {
     public static int NodeCount = 0;
     private boolean bLoop = true;
@@ -11,10 +14,14 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private String address;
     private Db db;
     private Blockchain bc;
+    private ArrayList<Transaction> mempool = new ArrayList<>();
 
     // Network
-    private static final int COMMAND_LEN = 13, INV_TYPE_LEN = 5;
+    private static final int COMMAND_LEN = 13, DATA_TYPE_LEN = 5;
     private Network network;
+
+    // Mutex
+    private Semaphore mempoolSem = new Semaphore(1);
 
     public Node(String address) throws Exception {
         this.address = address;
@@ -31,12 +38,32 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     }
 
     public void run() {
-        while(bLoop) {
+        while (bLoop) {
             if (!network.checkConnection()) {
                 network.close();
                 bLoop = false;
                 break;
             }
+
+            // mempool
+            try {
+                mempoolSem.acquire();
+                try {
+                    if (mempool.size() > 2) {
+                        Transaction[] txs = new Transaction[mempool.size()];
+                        for (int i = 0; i < mempool.size(); i++)
+                            txs[i] = mempool.get(i);
+                        mempool.clear();
+
+                        bc.MineBlock(txs);
+                    }
+                } catch (Exception ignored) {}
+                finally {
+                    mempoolSem.release();
+                }
+            } catch (InterruptedException ignored) {
+            }
+
             try {
                 sleep(100L);
             } catch (InterruptedException ignored) {}
@@ -53,7 +80,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     }
 
     public void close() {
-        this.bLoop = false;
+        bLoop = false;
     }
 
     private void requestBlocks() {
@@ -83,11 +110,11 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             System.arraycopy(items[i], 0, data, j, items[i].length);
 
         // Buff
-        byte[] buff = new byte[COMMAND_LEN + INV_TYPE_LEN + data.length];
+        byte[] buff = new byte[COMMAND_LEN + DATA_TYPE_LEN + data.length];
 
         System.arraycopy(command, 0, buff, 0, command.length);
         System.arraycopy(invType, 0, buff, COMMAND_LEN, invType.length);
-        System.arraycopy(data, 0, buff, COMMAND_LEN+INV_TYPE_LEN, data.length);
+        System.arraycopy(data, 0, buff, COMMAND_LEN+DATA_TYPE_LEN, data.length);
 
         client.send(buff);
     }
@@ -130,19 +157,14 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
     private void handleBlock(byte[] data, Blockchain bc) {
     }
-
     private void handleInv(byte[] data, Blockchain bc) {
     }
-
     private void handleGetBlocks(Client client, byte[] data, Blockchain bc) {
     }
-
     private void handleGetData(Client client, byte[] data, Blockchain bc) {
     }
-
     private void handleTx(byte[] data, Blockchain bc) {
     }
-
     private void handleVersion(byte[] data, Blockchain bc) {
     }
 

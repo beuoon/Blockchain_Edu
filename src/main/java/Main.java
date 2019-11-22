@@ -2,6 +2,7 @@ import org.bitcoinj.core.Base58;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String args[]) throws Exception{
@@ -38,7 +39,7 @@ public class Main {
         Wallets wallets = new Wallets();
         ArrayList<String> addressArr = new ArrayList<>();
         ArrayList<Node> nodes = new ArrayList<>();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 2; i++) {
             String address = wallets.createWallet();
             Node node = new Node(address);
             node.start();
@@ -47,7 +48,16 @@ public class Main {
             nodes.add(node);
         }
 
+        // Test
+        nodes.get(0);
+
+        Scanner scan = new Scanner(System.in);
+        scan.next();
+
         for (Node node: nodes)
             node.close();
+
+        for (Node node: nodes)
+            node.join();
     }
 }

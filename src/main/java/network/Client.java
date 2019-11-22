@@ -36,18 +36,24 @@ public class Client extends Thread {
     public void run() {
         Event<MessageEventArgs> event = new Event<MessageEventArgs>();
 
+        byte[] buff = new byte[BUFF_SIZE];
+        int buffLen;
         try {
             while (true) {
-                byte[] buff = new byte[BUFF_SIZE];
-                input.read(buff);
-                event.raiseEvent(this, new MessageEventArgs(buff));
-            }
-        } catch (Exception ignored) { }
+                if ((buffLen = input.read(buff)) == -1) break;
+                System.out.println("read(" +port+ ")[" + buffLen + "] : " + buff);
 
-        close();
+                byte[] message = new byte[buffLen];
+                System.arraycopy(buff, 0, message, 0, buffLen);
+                event.raiseEvent(this, new MessageEventArgs(message));
+
+                sleep(100);
+            }
+        } catch (Exception ignored) {}
     }
 
     public void send(byte[] buff) {
+        System.out.println("에..?");
         try {
             output.write(buff);
             output.flush();
@@ -56,18 +62,15 @@ public class Client extends Thread {
         }
     }
 
-
     public void close() {
         try {
             input.close();
             output.close();
-        } catch (IOException ignored) { }
+        } catch (IOException ignored) {}
 
         try {
             if (!socket.isClosed())
                 socket.close();
-        } catch (IOException ignored) { }
-
-        System.out.println("클라이언트 종료");
+        } catch (IOException ignored) {}
     }
 }

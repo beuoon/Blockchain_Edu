@@ -5,7 +5,7 @@ public class ProofOfWork {
     static final BigInteger target = new BigInteger("1").shiftLeft(256-targetBits);
 
     private static byte[] prepareData(Block block, int nonce) {
-        return Utils.bytesConcat(block.getBytesExceptHash(), new Integer(targetBits).toString().getBytes(), new Integer(nonce).toString().getBytes());
+        return Utils.bytesConcat(block.getBytesExceptHash(), Integer.toString(targetBits).getBytes(), Integer.toString(nonce).getBytes());
     }
 
     public static void mine(Block block) {
