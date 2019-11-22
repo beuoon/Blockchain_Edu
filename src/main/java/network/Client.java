@@ -28,8 +28,6 @@ public class Client extends Thread {
                 this.socket.close();
             } catch (IOException ignored) { }
         }
-
-        if (port != -1) System.out.println("소켓 연결 - " + port);
     }
 
     @Override
@@ -41,7 +39,6 @@ public class Client extends Thread {
         try {
             while (true) {
                 if ((buffLen = input.read(buff)) == -1) break;
-                System.out.println("read(" +port+ ")[" + buffLen + "] : " + buff);
 
                 byte[] message = new byte[buffLen];
                 System.arraycopy(buff, 0, message, 0, buffLen);
@@ -53,7 +50,6 @@ public class Client extends Thread {
     }
 
     public void send(byte[] buff) {
-        System.out.println("에..?");
         try {
             output.write(buff);
             output.flush();

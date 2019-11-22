@@ -127,4 +127,23 @@ public class Transaction implements Serializable {
         return Vout;
     }
 
+    public static Transaction bytesToTx(byte[] bytes) {
+        ByteArrayInputStream bis = null;
+        ObjectInputStream ois = null;
+
+        Transaction tx = null;
+
+        try {
+            bis = new ByteArrayInputStream(bytes);
+            ois = new ObjectInputStream(bis);
+            tx = (Transaction)ois.readObject();
+            ois.close();
+        } catch (Exception ignored) {
+        } finally {
+            if (bis != null) try { bis.close(); } catch (IOException ignored) {}
+            if (ois != null) try { ois.close(); } catch (IOException ignored) {}
+        }
+
+        return tx;
+    }
 }

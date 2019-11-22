@@ -3,7 +3,8 @@ import event.MessageEventArgs;
 import network.Client;
 import network.Network;
 
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.concurrent.Semaphore;
 
 public class Node extends Thread implements EventHandler<MessageEventArgs> {
@@ -11,10 +12,10 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private boolean bLoop = true;
 
     // Blockchain
-    private String address;
+    private Wallets wallets;
     private Db db;
     private Blockchain bc;
-    private ArrayList<Transaction> mempool = new ArrayList<>();
+    private HashMap<byte[], Transaction> mempool = new HashMap<>();
 
     // Network
     private static final int COMMAND_LEN = 13, DATA_TYPE_LEN = 5;
@@ -23,12 +24,12 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     // Mutex
     private Semaphore mempoolSem = new Semaphore(1);
 
-    public Node(String address) throws Exception {
-        this.address = address;
+    public Node() throws Exception {
+        wallets = new Wallets();
         this.db = new Db();
 
         if (NodeCount == 0)
-            this.bc = new Blockchain(this.address, this.db);
+            this.bc = new Blockchain(this.wallet.getAddress(), this.db);
         else {
             this.bc = new Blockchain(this.db);
             // TODO: blockchain 갱신
@@ -37,7 +38,24 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         this.network = new Network(NodeCount++);
     }
 
+    public void send(Wallet from, String to, int amount, Blockchain bc) throws Exception {
+        Transaction tx = bc.newUTXOTransaction(from, to, amount);
+
+        try {
+            mempoolSem.acquire();
+            try {
+                mempool.put(tx.getId(), tx);
+            } catch (Exception ignored) {}
+            finally {
+                mempoolSem.release();
+            }
+        } catch (InterruptedException ignored) {}
+
+        sendTx(tx);
+    }
+
     public void run() {
+
         while (bLoop) {
             if (!network.checkConnection()) {
                 network.close();
@@ -51,8 +69,10 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
                 try {
                     if (mempool.size() > 2) {
                         Transaction[] txs = new Transaction[mempool.size()];
-                        for (int i = 0; i < mempool.size(); i++)
-                            txs[i] = mempool.get(i);
+                        Iterator<Transaction> iter = mempool.values().iterator();
+
+                        for (int i = 0; i < mempool.size() && iter.hasNext(); i++)
+                            txs[i] = iter.next();
                         mempool.clear();
 
                         bc.MineBlock(txs);
@@ -61,9 +81,9 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
                 finally {
                     mempoolSem.release();
                 }
-            } catch (InterruptedException ignored) {
-            }
+            } catch (InterruptedException ignored) {}
 
+            // sleep
             try {
                 sleep(100L);
             } catch (InterruptedException ignored) {}
@@ -88,8 +108,10 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
     private void sendBlock(Client client, Block b) {
         byte[] command = (new String("block")).getBytes();
-        byte[] data = null; // TODO: b.serialize();
+        byte[] data = Utils.toBytes(b);
         byte[] buff = new byte[COMMAND_LEN + data.length];
+
+        Utils.bytesConcat(command, data);
 
         System.arraycopy(command, 0, buff, 0, command.length);
         System.arraycopy(data, 0, buff, COMMAND_LEN, data.length);
@@ -134,9 +156,19 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         client.send(buff);
     }
+    private void sendTx(Transaction tx) {
+        byte[] command = (new String("tx")).getBytes();
+        byte[] data = Utils.toBytes(tx);
+        byte[] buff = new byte[COMMAND_LEN + data.length];
+
+        System.arraycopy(command, 0, buff, 0, command.length);
+        System.arraycopy(data, 0, buff, COMMAND_LEN, data.length);
+
+        network.sendAll(buff);
+    }
     private void sendTx(Client client, Transaction tx) {
         byte[] command = (new String("tx")).getBytes();
-        byte[] data = null; // TODO: tx.serialize();
+        byte[] data = Utils.toBytes(tx);
         byte[] buff = new byte[COMMAND_LEN + data.length];
 
         System.arraycopy(command, 0, buff, 0, command.length);
@@ -156,6 +188,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     }
 
     private void handleBlock(byte[] data, Blockchain bc) {
+        Block block = Block.bytesToBlock(data);
     }
     private void handleInv(byte[] data, Blockchain bc) {
     }
@@ -164,6 +197,21 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private void handleGetData(Client client, byte[] data, Blockchain bc) {
     }
     private void handleTx(byte[] data, Blockchain bc) {
+        Transaction tx = Transaction.bytesToTx(data);
+
+        try {
+            mempoolSem.acquire();
+            try {
+                if (!mempool.containsKey(tx.id)) {
+                    mempool.put(tx.id, tx);
+                    // 전파
+                }
+
+            } finally {
+                mempoolSem.release();
+            }
+
+        } catch (InterruptedException ignored) {}
     }
     private void handleVersion(byte[] data, Blockchain bc) {
     }

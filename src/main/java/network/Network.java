@@ -23,7 +23,6 @@ public class Network {
         if (connNum > number) connNum = number;
 
         HashSet<Integer> bUsePort = new HashSet<>();
-        System.out.println(number + " 연결 !!");
 
         while(connNum > 0) {
             int port = BASE_PORT + rand.nextInt(number);
