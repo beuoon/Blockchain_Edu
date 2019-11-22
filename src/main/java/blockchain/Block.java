@@ -19,15 +19,15 @@ public class Block implements Serializable{
 
     //genesis block
     public Block(Transaction coinbase) {
-        this(new Transaction[]{coinbase}, new byte[0]);
+        this(new Transaction[]{coinbase}, new byte[0], 0);
     }
 
     //normal block
-    public Block(Transaction[] transactions, byte[] prevBlockHash) {
+    public Block(Transaction[] transactions, byte[] prevBlockHash, int height) {
         this.timestamp = System.currentTimeMillis();
         this.transactions = transactions;
         this.prevBlockHash = prevBlockHash;
-        ProofOfWork.mine(this);
+        this.height = height;
     }
 
     //bytes to block
@@ -39,6 +39,7 @@ public class Block implements Serializable{
         this.prevBlockHash = block.prevBlockHash;
         this.hash = block.hash;
         this.nonce = block.nonce;
+        this.height = block.height;
     }
 
     public byte[] getBytesExceptHash() {
@@ -63,6 +64,9 @@ public class Block implements Serializable{
 
     public void setNonce(int nonce) {
         this.nonce = nonce;
+    }
+    public int getHeight() {
+        return height;
     }
 
     public Transaction[] getTransactions() {

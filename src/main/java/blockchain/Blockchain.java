@@ -15,6 +15,8 @@ import java.util.*;
 public class Blockchain {
     private Db db;
     byte[] tip;
+    int lastHeight;
+
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
 
     public Blockchain(String address, Db db) {
@@ -39,36 +41,84 @@ public class Blockchain {
     public Block mineBlock(Transaction[] transactions) {
         Bucket bucket = db.getBucket("blocks");
         byte[] lastHash = bucket.get("l");
+        Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lastHash)));
 
-        Block newBlock = new Block(transactions, lastHash);
+        Block newBlock = new Block(transactions, lastHash, lastBlock.getHeight()+1);
+        if(!ProofOfWork.mine(newBlock)) return null;
+
         bucket.put(Utils.byteArrayToHexString(newBlock.getHash()), Utils.toBytes(newBlock));
-
         bucket.put("l", newBlock.getHash());
+
+        ArrayList<byte[]> blockList = new ArrayList<>();
+        blockList.add(newBlock.getHash());
+        bucket.put("h" + newBlock.getHeight(), Utils.toBytes(blockList));
+
         this.tip = newBlock.getHash();
 
         return newBlock;
     }
+
     public boolean addBlock(Block block) {
         Bucket bucket = db.getBucket("blocks");
-        byte[] lastHash = tip;
 
-        try { // 합의
-            ProofOfWork.validate(block);
-        } catch (Exception e) { return false; }
+
+       //블록이 PoW를 만족하는가?
+        ProofOfWork.validate(block);
 
         // 트랜잭션 검증
         for (Transaction tx : block.getTransactions()) {
-            try {
-                if (!verifyTransaction(tx))
-                    return false;
-            } catch (Exception e) { return false; }
+                if (!verifyTransaction(tx)) return false;
         }
 
         // TODO: 블록 검증
+        // 포크
 
-        bucket.put(new String(block.getHash()), Utils.toBytes(block));
+        //지금 온 블록이 최신 블록 보다 작거나 같으면?
+        if(block.getHeight() <= lastHeight) {
+            ArrayList<byte[]> hashList = Utils.toObject(bucket.get("h"+ (block.getHeight()-1)));
+            for(byte[] hash : hashList) {
+                Block b = Utils.toObject(bucket.get(Utils.byteArrayToHexString(hash)));
+                if(Arrays.equals(b.getHash(), block.getPrevBlockHash())) {
+                    ArrayList<byte[]> blockList = new ArrayList<>();
+
+                    if(bucket.get("h" + block.getHeight()) != null)
+                        blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
+                    blockList.add(block.getHash());
+
+                    bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
+                    bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
+        boolean flag = false;
+        //이 블록이 내 최신높이에 있는 블록의 다음블록이 맞느냐?
+        ArrayList<byte[]> lasthashList = Utils.toObject(bucket.get("h"+ (block.getHeight()-1)));
+        for(byte[] lasthash : lasthashList) {
+            Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lasthash)));
+            if (Arrays.equals(block.getPrevBlockHash(), lastBlock.getHash())) {
+                flag = true;
+            }
+        }
+        if(!flag) return false;
+
+        //PoW 중지.
+        ProofOfWork.powStopFlag = true;
+
+        bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
         bucket.put("l", block.getHash());
+
+        ArrayList<byte[]> blockList = new ArrayList<>();
+        if(bucket.get("h" + block.getHeight()) != null)
+            blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
+        blockList.add(block.getHash());
+
+        bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
         tip = block.getHash();
+
 
         return true;
     }
