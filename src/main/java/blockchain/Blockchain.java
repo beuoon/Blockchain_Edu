@@ -277,8 +277,6 @@ public class Blockchain {
         public boolean hasNext() {
             byte[] b = db.getBucket("blocks").get(Utils.byteArrayToHexString(currentHash));
             if( b == null) return false;
-
-            Block block = new Block(b);
             return true;
         }
 
