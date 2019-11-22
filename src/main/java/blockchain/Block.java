@@ -1,7 +1,10 @@
+package blockchain;
+
+import blockchain.consensus.ProofOfWork;
+import blockchain.transaction.Transaction;
+import utils.Utils;
+
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
 
 public class Block implements Serializable{
 

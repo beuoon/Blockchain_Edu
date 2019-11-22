@@ -1,8 +1,6 @@
-import org.bitcoinj.core.Base58;
-
-import java.security.PublicKey;
-import java.util.ArrayList;
-import java.util.Iterator;
+import DB.Db;
+import blockchain.Blockchain;
+import blockchain.wallet.Wallets;
 
 public class Main {
     public static void main(String args[]) throws Exception{
@@ -23,7 +21,7 @@ public class Main {
         Functions.getBalance(address3, bc);
 
 
-        Functions.send(wallets.getWallet(address1), address2, 30, bc);
+        Functions.send(wallets.getWallet(address1), address2, 10, bc);
 
         Functions.getBalance(address1, bc);
         Functions.getBalance(address2, bc);
@@ -36,7 +34,7 @@ public class Main {
         Functions.getBalance(address3, bc);
 
 
-        Functions.send(wallets.getWallet(address1), address3, 30, bc);
+        Functions.send(wallets.getWallet(address1), address3, 10, bc);
 
         Functions.getBalance(address1, bc);
         Functions.getBalance(address2, bc);
@@ -44,7 +42,7 @@ public class Main {
 
 
 
-/*        Wallets wallets = new Wallets();
+/*        blockchain.wallet.Wallets wallets = new blockchain.wallet.Wallets();
         ArrayList<String> addressArr = new ArrayList<>();
         ArrayList<Node> nodes = new ArrayList<>();
         for (int i = 0; i < 2; i++) {

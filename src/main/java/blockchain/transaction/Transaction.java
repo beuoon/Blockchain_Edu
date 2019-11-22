@@ -1,18 +1,17 @@
+package blockchain.transaction;
+
+import utils.Utils;
+
 import java.io.*;
 import java.security.*;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Locale;
 
 public class Transaction implements Serializable {
 
-    final static int COINBASE = 1;
-
-    byte[] id;
-    ArrayList<TxInput> Vin = new ArrayList();
-    ArrayList<TxOutput> Vout = new ArrayList();
+    private byte[] id;
+    private ArrayList<TxInput> Vin = new ArrayList();
+    private ArrayList<TxOutput> Vout = new ArrayList();
 
     //temp value
     final int subsidy = 50;
@@ -20,7 +19,7 @@ public class Transaction implements Serializable {
     //coinbasetx
     public Transaction(String to, String data) {
         if(data.equals("")) {
-            data = String.format("Reward to '%s'", to);
+            data = String.format("conbase Tx %s", Utils.sha256(Float.valueOf(new SecureRandom().nextFloat()).toString().getBytes()));
         }
 
         id = new byte[]{};
@@ -104,7 +103,6 @@ public class Transaction implements Serializable {
         return new Transaction(id, inputs, outputs);
     }
 
-
     public boolean isCoinBase() {
         if(Vin.size() == 1 && Vin.get(0).getTxId().length == 0 && Vin.get(0).getvOut() == -1) return true;
         return false;
@@ -113,7 +111,6 @@ public class Transaction implements Serializable {
     public void setId(byte[] id){
         this.id = id;
     }
-
 
     public byte[] getId() {
         return id;

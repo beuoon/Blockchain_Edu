@@ -1,3 +1,7 @@
+import DB.Db;
+import blockchain.Block;
+import blockchain.Blockchain;
+import blockchain.transaction.Transaction;
 import event.EventHandler;
 import event.MessageEventArgs;
 import network.Client;
@@ -7,7 +11,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     public static int NodeCount = 0;
     private boolean bLoop = true;
 
-    // Blockchain
+    // blockchain.Blockchain
     private String address;
     private Db db;
     private Blockchain bc;

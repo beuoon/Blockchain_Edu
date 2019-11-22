@@ -62,7 +62,7 @@ public class Utils {
         return data;
     }
 
-    public static byte[] toBytes(Object... o) {
+    public static <T> byte[] toBytes(T o) {
         ByteArrayOutputStream bos = null;
         ObjectOutputStream oos = null;
         try {
@@ -78,6 +78,20 @@ public class Utils {
         return bos.toByteArray();
     }
 
+    public static <T> T toObject(byte[] b) {
+        ByteArrayInputStream bis =null;
+        ObjectInput in = null;
+        T obj = null;
+        try {
+            bis = new ByteArrayInputStream(b);
+            in = new ObjectInputStream(bis);
+            obj = (T)in.readObject();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return obj;
+    }
 
     public static byte[] hashPubKey(byte[] pubkey) {
         return new byte[]{};
