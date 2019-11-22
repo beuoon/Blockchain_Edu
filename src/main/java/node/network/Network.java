@@ -16,7 +16,7 @@ import java.util.Random;
 
 public class Network {
 
-    public static interface TYPE {
+    public interface TYPE {
         int NONE = 1, BLOCK = 2, INV = 3, GETBLOCK = 4, GETDATA = 5 , TX = 6, VERSION = 7;
     }
 
@@ -61,21 +61,12 @@ public class Network {
     public void broadcast(Object o) {
         String className = o.getClass().getSimpleName();
         switch(className) {
-            case "Trnasaction" :
+            case "Transaction" :
                 for (Client client : clients)
                     sendTx(client, (Transaction)o);
                 break;
         }
 
-    }
-
-    public void sendTx(Client client, Transaction tx) {
-        byte[] command = new byte[]{TYPE.TX};
-        byte[] data = Utils.toBytes(tx);
-
-        byte[] buff = Utils.bytesConcat(command, data);
-
-        client.send(buff);
     }
 
     public boolean checkConnection() {
@@ -110,9 +101,9 @@ public class Network {
     public void requestBlocks() {
     }
 
-    public void sendBlock(Client client, Block b) {
+    public void sendBlock(Client client, Block block) {
         byte[] command = new byte[]{TYPE.BLOCK};
-        byte[] data = Utils.toBytes(b);
+        byte[] data = Utils.toBytes(block);
 
         byte[] buff = Utils.bytesConcat(command, data);
 
@@ -136,8 +127,19 @@ public class Network {
     public void sendGetData(Client client, int invType, byte[] data) {
         byte[] command = new byte[]{TYPE.GETDATA};
         byte[] it = new byte[]{(byte)invType};
+
         byte[] buffer = Utils.bytesConcat(command, it, data);
+
         client.send(buffer);
+    }
+
+    public void sendTx(Client client, Transaction tx) {
+        byte[] command = new byte[]{TYPE.TX};
+        byte[] data = Utils.toBytes(tx);
+
+        byte[] buff = Utils.bytesConcat(command, data);
+
+        client.send(buff);
     }
 
     public void sendVersion(Client client, Blockchain bc) {
