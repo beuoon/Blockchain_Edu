@@ -59,7 +59,7 @@ public class Main {
         nodes.add(firstNode);
 
         System.out.println("제네시스 블록 만들때까지 대기..");
-        Thread.sleep(500);
+        Thread.sleep(1000);
 
         for (int i = 1; i < 10; i++) {
             Node node = new Node();

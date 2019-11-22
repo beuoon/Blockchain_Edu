@@ -43,14 +43,17 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         this.db = new Db();
 
         number = NodeCount++;
-        if (number == 0)
-            this.bc = new Blockchain(address, this.db);
-        else {
-            this.bc = new Blockchain(this.db);
-            // TODO: blockchain 갱신
-        }
 
-        this.network = new Network(number, this);
+        network = new Network(number, this);
+
+        if (number == 0)
+            bc = new Blockchain(address, db);
+        else {
+            bc = new Blockchain(db);
+
+            Client client = network.getClients().get(0);
+            sendGetBlocks(client);
+        }
     }
 
     // TEST
@@ -87,7 +90,6 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     public String getAddress() { return address; }
 
     public void run() {
-
         while (bLoop) {
             try {
                 sleep(100L);
@@ -215,7 +217,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // 블록 전파
         for (Client client : network.getClients())
-            sendInv(client, InvType.Block, new byte[][]{newBlock.getHash()});
+            sendInv(client, InvType.Block, newBlock.getHash());
     }
 
     public void eventReceived(Object sender, MessageEventArgs e) {
@@ -237,19 +239,10 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         client.send(buff);
     }
-    private void sendInv(Client client, InvType kind, byte[][] items) {
+    private void sendInv(Client client, InvType kind, byte[] data) {
         byte[] command = new byte[]{CommandType.Inv.getNumber()};
         byte[] invType = new byte[]{kind.getNumber()};
 
-        // Data
-        int dataLen = 0;
-        for (byte[] item : items) dataLen += item.length;
-
-        byte[] data = new byte[dataLen];
-        for (int i = 0, j = 0; i < items.length; j += items[i++].length)
-            System.arraycopy(items[i], 0, data, j, items[i].length);
-
-        // Buff
         byte[] buff = Utils.bytesConcat(command, invType, data);
 
         client.send(buff);
@@ -286,6 +279,8 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
     private void handleBlock(byte[] data, Blockchain bc) {
         Block block = Utils.toObject(data);
+
+        System.out.println(Utils.byteArrayToHexString(block.getHash()));
 
         if (!bc.validate()) return ;
 
@@ -336,19 +331,39 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             }
         }
     }
-    private void handleGetBlocks(Client client, byte[] data, Blockchain bc) {
+    private void handleGetBlocks(Client client, Blockchain bc) {
+        Iterator<Block> iter = bc.iterator();
+        ArrayList<byte[]> blockHashes = new ArrayList<>();
+        while (iter.hasNext()) {
+            Block block = iter.next();
+             blockHashes.add(block.getHash());
+        }
+
+        byte[] data = Utils.bytesConcat(blockHashes.toArray(new byte[][]{}));
+
+        sendInv(client, InvType.Block, data);
     }
     private void handleGetData(Client client, byte[] data, Blockchain bc) {
         InvType it = InvType.valueOf(data[0]);
-        byte[] hashByte = new byte[data.length-1];
-        System.arraycopy(data, 1, hashByte, 0, hashByte.length);
-        String hash = Utils.byteArrayToHexString(hashByte);
+        byte[] hash = new byte[data.length-1];
+        System.arraycopy(data, 1, hash, 0, hash.length);
 
         if (it == InvType.Block) {
-            bc.findBlock(hashByte);
+            Block block = bc.findBlock(hash);
+            if (block != null)
+                sendBlock(client, block);
         }
         else if (it == InvType.Tx) {
+            String id = Utils.byteArrayToHexString(hash);
+            Transaction tx = null;
 
+            if (mempool.containsKey(id))
+                tx = mempool.get(id);
+            else
+                tx = bc.findTransaction(hash);
+
+            if (tx != null)
+                sendTx(client, tx);
         }
     }
     private void handleTx(Client sendClient, byte[] data, Blockchain bc) {
@@ -387,8 +402,8 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         switch(ct) {
             case Block:       handleBlock(data, bc);              break;
-            case Inv:         handleInv(client, data, bc);                break;
-            case GetBlock :   handleGetBlocks(client, data, bc);  break;
+            case Inv:         handleInv(client, data, bc);        break;
+            case GetBlock :   handleGetBlocks(client, bc);        break;
             case GetData:     handleGetData(client, data, bc);    break;
             case Tx:          handleTx(client, data, bc);         break;
             case Version:     handleVersion(data, bc);            break;
