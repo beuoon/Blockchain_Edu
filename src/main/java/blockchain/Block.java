@@ -1,18 +1,12 @@
 package blockchain;
 
 import blockchain.consensus.ProofOfWork;
-<<<<<<< HEAD:src/main/java/blockchain/Block.java
-=======
 import blockchain.merkletree.MerkleTree;
->>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7:src/main/java/Block.java
 import blockchain.transaction.Transaction;
 import utils.Utils;
 
 import java.io.*;
-<<<<<<< HEAD:src/main/java/blockchain/Block.java
-=======
 import java.util.ArrayList;
->>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7:src/main/java/Block.java
 
 public class Block implements Serializable{
 
@@ -21,7 +15,7 @@ public class Block implements Serializable{
     private byte[] prevBlockHash;
     private byte[] hash;
     private int nonce;
-    private int Height;
+    private int height;
 
     //genesis block
     public Block(Transaction coinbase) {
@@ -57,14 +51,6 @@ public class Block implements Serializable{
 
     public byte[] getBytesExceptHash() {
         return Utils.bytesConcat(String.valueOf(timestamp).getBytes(), Utils.sha256(Utils.toBytes(transactions)), prevBlockHash);
-    }
-
-    public byte[] toBytes() throws IOException {
-        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        final ObjectOutputStream oos = new ObjectOutputStream(bos);
-        oos.writeObject(this); oos.flush(); oos.close();
-
-        return bos.toByteArray();
     }
 
     public long getTimestamp() {
@@ -103,25 +89,5 @@ public class Block implements Serializable{
         }
 
         return Utils.sha256(Utils.toBytes(txHashes));
-    }
-
-    public static Block bytesToBlock(byte[] bytes) {
-        ByteArrayInputStream bis = null;
-        ObjectInputStream ois = null;
-
-        Block block = null;
-
-        try {
-            bis = new ByteArrayInputStream(bytes);
-            ois = new ObjectInputStream(bis);
-            block = (Block)ois.readObject();
-            ois.close();
-        } catch (Exception ignored) {
-        } finally {
-            if (bis != null) try { bis.close(); } catch (IOException ignored) {}
-            if (ois != null) try { ois.close(); } catch (IOException ignored) {}
-        }
-
-        return block;
     }
 }

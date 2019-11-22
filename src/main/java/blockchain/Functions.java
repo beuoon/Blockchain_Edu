@@ -1,8 +1,5 @@
-<<<<<<< HEAD:src/main/java/blockchain/Functions.java
 package blockchain;
 
-=======
->>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7:src/main/java/Functions.java
 import blockchain.Block;
 import blockchain.Blockchain;
 import blockchain.transaction.Transaction;
@@ -35,7 +32,7 @@ public class Functions {
 
         Transaction tx = bc.newUTXOTransaction(from, to, amount, utxoSet);
         Transaction coinbase = new Transaction(from.getAddress(), "");
-        Block newBlock = bc.MineBlock(new Transaction[]{coinbase, tx});
+        Block newBlock = bc.mineBlock(new Transaction[]{coinbase, tx});
 
         utxoSet.update(newBlock);
 

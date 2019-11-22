@@ -2,6 +2,7 @@ package blockchain;
 
 import DB.Bucket;
 import DB.Db;
+import blockchain.consensus.ProofOfWork;
 import blockchain.transaction.*;
 import blockchain.wallet.Wallet;
 import utils.Pair;
@@ -12,15 +13,15 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 
 public class Blockchain {
-        private Db db;
+    private Db db;
     byte[] tip;
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
 
-    public Blockchain(String address, Db db) throws Exception{
+    public Blockchain(String address, Db db) {
         Transaction coinbaseTx = new Transaction(address, genesisCoinbaseData);
         Block genesisBlock = new Block(coinbaseTx); // create genesis block
 
-        db.getBucket("blocks").put(new String(genesisBlock.getHash()), genesisBlock.toBytes()); // put genesis block to blockchain
+        db.getBucket("blocks").put(new String(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchain
         db.getBucket("blocks").put("l", genesisBlock.getHash());
 
         this.db = db;
@@ -32,27 +33,45 @@ public class Blockchain {
 
     public Blockchain(Db db) {
         this.db = db;
-        this.tip = new byte[]{};
+        this.tip = null;
     }
 
 
-    public Block MineBlock(Transaction[] transactions) throws Exception{
-
-        for(Transaction tx : transactions) {
-            if(!VerifyTransaction(tx)){
-                throw new Exception("Eror: Invalid transaction");
-            }
-        }
-
+    public Block mineBlock(Transaction[] transactions)  {
         Bucket bucket = db.getBucket("blocks");
         byte[] lastHash = bucket.get("l");
+
         Block newBlock = new Block(transactions, lastHash);
-        bucket.put(new String(newBlock.getHash()) ,newBlock.toBytes());
+        bucket.put(new String(newBlock.getHash()), Utils.toBytes(newBlock));
 
         bucket.put("l", newBlock.getHash());
         this.tip = newBlock.getHash();
 
         return newBlock;
+    }
+    public boolean addBlock(Block block) {
+        Bucket bucket = db.getBucket("blocks");
+        byte[] lastHash = tip;
+
+        try { // 합의
+            ProofOfWork.validate(block);
+        } catch (Exception e) { return false; }
+
+        // 트랜잭션 검증
+        for (Transaction tx : block.getTransactions()) {
+            try {
+                if (!VerifyTransaction(tx))
+                    return false;
+            } catch (Exception e) { return false; }
+        }
+
+        // TODO: 블록 검증
+
+        bucket.put(new String(block.getHash()), Utils.toBytes(block));
+        bucket.put("l", block.getHash());
+        tip = block.getHash();
+
+        return true;
     }
 
     public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
@@ -222,6 +241,9 @@ public class Blockchain {
 
     public Db getDb() {
         return db;
+    }
+    public boolean validate() {
+        return tip != null;
     }
 
     public Iterator<Block> iterator() {

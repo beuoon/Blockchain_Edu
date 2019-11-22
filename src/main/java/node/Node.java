@@ -3,11 +3,9 @@ package node;
 import DB.Db;
 import blockchain.*;
 import blockchain.transaction.Transaction;
-<<<<<<< HEAD
 import blockchain.transaction.TxOutput;
 import blockchain.transaction.UTXOSet;
-=======
->>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7
+import blockchain.wallet.Wallet;
 import blockchain.wallet.Wallets;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;
@@ -26,7 +24,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private boolean bLoop = true;
 
     // Wallet
-    private Wallets wallets;
+    private Wallet wallet;
     private String address;
 
     // Blockchain
@@ -42,8 +40,8 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private Semaphore mempoolSem = new Semaphore(1);
 
     public Node() throws Exception {
-        wallets = new Wallets();
-        address = wallets.createWallet();
+        wallet = new Wallet();
+        address = wallet.getAddress();
 
         this.db = new Db();
 
@@ -61,7 +59,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     // TEST
     public void send(String to, int amount) throws Exception {
         UTXOSet utxoSet = new UTXOSet(bc);
-        Transaction tx = bc.newUTXOTransaction(wallets.getWallet(address), to, amount, utxoSet);
+        Transaction tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
 
         try {
             mempoolSem.acquire();
@@ -113,6 +111,8 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     }
 
     private void mineBlock() {
+        if (!bc.validate()) return ; // blockchain 준비 안됨
+
         // Transaction 준비
         Transaction[] txs = null;
         try {
@@ -138,7 +138,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         Block newBlock = null;
         try {
-            newBlock = bc.MineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
+            newBlock = bc.mineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -147,7 +147,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // UTXO reindex
         UTXOSet utxoSet = new UTXOSet(bc);
-        utxoSet.reIndex();
+        utxoSet.update(newBlock);
 
         // 블록내 트랜잭션 pool 에서 제거
         try {
@@ -235,7 +235,9 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private void handleBlock(byte[] data, Blockchain bc) {
         Block block = Utils.toObject(data);
 
-        // TODO: bc.addBlock(block);
+        if (!bc.validate()) return ;
+
+        if (!bc.addBlock(block)) return ;
 
         // UTXO reindex
         UTXOSet utxoSet = new UTXOSet(bc);

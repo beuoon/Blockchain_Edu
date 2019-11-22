@@ -1,11 +1,8 @@
 import DB.Db;
 import blockchain.Blockchain;
 import blockchain.wallet.Wallets;
-<<<<<<< HEAD
 import blockchain.Functions;
 import node.Node;
-=======
->>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7
 import org.bitcoinj.core.Base58;
 
 import java.security.PublicKey;
@@ -14,12 +11,8 @@ import java.util.Iterator;
 import java.util.Scanner;
 
 public class Main {
-<<<<<<< HEAD
     public static void main(String args[]) throws Exception {
         /*
-=======
-    public static void main(String args[]) throws Exception{
->>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7
         Db db = new Db();
         Wallets wallets = new Wallets();
         String address1 = wallets.createWallet();
@@ -54,37 +47,50 @@ public class Main {
         Functions.getBalance(address2, bc);
         Functions.getBalance(address3, bc);
 
-/*
+         */
+
         Wallets wallets = new Wallets();
         ArrayList<String> addressArr = new ArrayList<>();
         ArrayList<Node> nodes = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            String address = wallets.createWallet();
+
+        Node firstNode = new Node();
+        firstNode.start();
+        addressArr.add(firstNode.getAddress());
+        nodes.add(firstNode);
+
+        Scanner scan = new Scanner(System.in);
+        System.out.print("enter key");
+        scan.next();
+
+        for (int i = 1; i < 10; i++) {
             Node node = new Node();
             node.start();
 
-            addressArr.add(address);
+            addressArr.add(node.getAddress());
             nodes.add(node);
         }
 
-        Scanner scan = new Scanner(System.in);
+        System.out.print("enter key");
         scan.next();
 
         // Test
         nodes.get(0).send(nodes.get(1).getAddress(), 5);
         nodes.get(0).send(nodes.get(2).getAddress(), 5);
 
+        System.out.print("enter key");
         scan.next();
 
         for (Node node: nodes)
             node.checkBalance();
 
+        System.out.print("enter key");
         scan.next();
 
         for (Node node: nodes)
             node.close();
 
         for (Node node: nodes)
-            node.join();*/
+            node.join();
     }
+
 }
