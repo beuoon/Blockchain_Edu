@@ -1,8 +1,11 @@
 import DB.Db;
 import blockchain.Blockchain;
 import blockchain.wallet.Wallets;
+<<<<<<< HEAD
 import blockchain.Functions;
 import node.Node;
+=======
+>>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7
 import org.bitcoinj.core.Base58;
 
 import java.security.PublicKey;
@@ -11,8 +14,12 @@ import java.util.Iterator;
 import java.util.Scanner;
 
 public class Main {
+<<<<<<< HEAD
     public static void main(String args[]) throws Exception {
         /*
+=======
+    public static void main(String args[]) throws Exception{
+>>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7
         Db db = new Db();
         Wallets wallets = new Wallets();
         String address1 = wallets.createWallet();
@@ -47,8 +54,7 @@ public class Main {
         Functions.getBalance(address2, bc);
         Functions.getBalance(address3, bc);
 
-         */
-
+/*
         Wallets wallets = new Wallets();
         ArrayList<String> addressArr = new ArrayList<>();
         ArrayList<Node> nodes = new ArrayList<>();
@@ -79,6 +85,6 @@ public class Main {
             node.close();
 
         for (Node node: nodes)
-            node.join();
+            node.join();*/
     }
 }

@@ -3,8 +3,11 @@ package node;
 import DB.Db;
 import blockchain.*;
 import blockchain.transaction.Transaction;
+<<<<<<< HEAD
 import blockchain.transaction.TxOutput;
 import blockchain.transaction.UTXOSet;
+=======
+>>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7
 import blockchain.wallet.Wallets;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;

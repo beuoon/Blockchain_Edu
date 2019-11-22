@@ -1,10 +1,18 @@
 package blockchain;
 
 import blockchain.consensus.ProofOfWork;
+<<<<<<< HEAD:src/main/java/blockchain/Block.java
+=======
+import blockchain.merkletree.MerkleTree;
+>>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7:src/main/java/Block.java
 import blockchain.transaction.Transaction;
 import utils.Utils;
 
 import java.io.*;
+<<<<<<< HEAD:src/main/java/blockchain/Block.java
+=======
+import java.util.ArrayList;
+>>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7:src/main/java/Block.java
 
 public class Block implements Serializable{
 
@@ -13,6 +21,7 @@ public class Block implements Serializable{
     private byte[] prevBlockHash;
     private byte[] hash;
     private int nonce;
+    private int Height;
 
     //genesis block
     public Block(Transaction coinbase) {
@@ -84,6 +93,16 @@ public class Block implements Serializable{
 
     public Transaction[] getTransactions() {
         return transactions;
+    }
+
+    public byte[] hashTransactions() {
+        ArrayList<byte[]> txHashes = new ArrayList<>();
+
+        for(Transaction tx : getTransactions()){
+            txHashes.add(Utils.toBytes(tx.Hash()));
+        }
+
+        return Utils.sha256(Utils.toBytes(txHashes));
     }
 
     public static Block bytesToBlock(byte[] bytes) {

@@ -1,5 +1,8 @@
+<<<<<<< HEAD:src/main/java/blockchain/Functions.java
 package blockchain;
 
+=======
+>>>>>>> 85f4eaf85e03f4f955aeef32b328777b04159aa7:src/main/java/Functions.java
 import blockchain.Block;
 import blockchain.Blockchain;
 import blockchain.transaction.Transaction;
