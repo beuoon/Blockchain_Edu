@@ -10,6 +10,8 @@ import blockchain.wallet.Wallet;
 import blockchain.wallet.Wallets;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;
+import node.network.Client;
+import node.network.Network;
 import org.bitcoinj.core.Base58;
 import utils.Utils;
 
@@ -108,28 +110,6 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             network.close();
     }
 
-    private void getInv() {
-        Iterator<String> blockIter = invBlock.iterator();
-        if (blockIter.hasNext()) {
-            String hash = blockIter.next();
-
-            Random random = new Random();
-            ArrayList<Client> clients = network.getClients();
-            Client client = clients.get(random.nextInt(clients.size()));
-            sendGetData(client, InvType.Block, Utils.hexStringToByteArray(hash));
-        }
-
-        Iterator<String> txIter = invTx.iterator();
-        if (txIter.hasNext()) {
-            String hash = txIter.next();
-
-            Random random = new Random();
-            ArrayList<Client> clients = network.getClients();
-            Client client = clients.get(random.nextInt(clients.size()));
-            sendGetData(client, InvType.Tx, Utils.hexStringToByteArray(hash));
-            invTx.remove(hash);
-        }
-    }
     private void mineBlock() {
         if (!bc.validate()) return ; // blockchain 준비 안됨
 
@@ -200,7 +180,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // 블록 전파
         for (Client client : network.getClients())
-            sendInv(client, InvType.Block, newBlock.getHash());
+            network.sendInv(client, Network.TYPE.BLOCK, newBlock.getHash());
     }
 
     public void eventReceived(Object sender, MessageEventArgs e) {
@@ -269,7 +249,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         byte[] data = Utils.bytesConcat(blockHashes.toArray(new byte[][]{}));
 
-        sendInv(client, InvType.Block, data);
+        network.sendInv(client, Network.TYPE.BLOCK, data);
     }
     private void handleGetData(Client client, byte[] data, Blockchain bc) {
         int TYPE = data[0];
@@ -279,7 +259,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             case Network.TYPE.BLOCK:
                 Block block = bc.findBlock(hash);
                 if (block != null)
-                    sendBlock(client, block);
+                    network.sendBlock(client, block);
                 break;
             case Network.TYPE.TX:
                 String id = Utils.byteArrayToHexString(hash);
@@ -291,7 +271,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
                     tx = bc.findTransaction(hash);
 
                 if (tx != null)
-                    sendTx(client, tx);
+                    network.sendTx(client, tx);
         }
     }
     private void handleTx(Client sendClient, byte[] data, Blockchain bc) {

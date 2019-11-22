@@ -119,20 +119,12 @@ public class Network {
         client.send(buff);
     }
 
-    public void sendInv(Client client, int invType, byte[][] items) {
+    public void sendInv(Client client, int invType, byte[] data) {
         byte[] command = new byte[]{TYPE.INV};
         byte[] binvType = new byte[]{(byte)invType};
 
-        // Data
-        int dataLen = 0;
-        for (byte[] item : items) dataLen += item.length;
-
-        byte[] data = new byte[dataLen];
-        for (int i = 0, j = 0; i < items.length; j += items[i++].length)
-            System.arraycopy(items[i], 0, data, j, items[i].length);
-
-        // Buff
         byte[] buff = Utils.bytesConcat(command, binvType, data);
+
         client.send(buff);
     }
 

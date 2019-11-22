@@ -66,7 +66,7 @@ public class Blockchain {
 
         // TODO: 블록 검증
 
-        bucket.put(new String(block.getHash()), Utils.toBytes(block));
+        bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
         bucket.put("l", block.getHash());
         tip = block.getHash();
 
@@ -275,7 +275,7 @@ public class Blockchain {
         }
 
         public boolean hasNext() {
-            byte[] b = db.getBucket("blocks").get(new String(currentHash));
+            byte[] b = db.getBucket("blocks").get(Utils.byteArrayToHexString(currentHash));
             if( b == null) return false;
 
             Block block = new Block(b);
@@ -287,7 +287,7 @@ public class Blockchain {
         }
 
         public Block next() {
-            Block block = new Block(db.getBucket("blocks").get(new String(currentHash)));
+            Block block = new Block(db.getBucket("blocks").get(Utils.byteArrayToHexString(currentHash)));
             currentHash = block.getPrevBlockHash();
 
             return block;
