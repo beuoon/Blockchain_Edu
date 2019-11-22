@@ -1,5 +1,6 @@
 package utils;
 
+import blockchain.Transaction;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
 import java.io.*;
@@ -62,38 +63,47 @@ public class Utils {
         return data;
     }
 
-    public static byte[] toBytes(Object... o) {
+    public static byte[] toBytes(Object o) {
         ByteArrayOutputStream bos = null;
         ObjectOutputStream oos = null;
+
+        byte[] bytes = null;
+
         try {
             bos = new ByteArrayOutputStream();
             oos = new ObjectOutputStream(bos);
             oos.writeObject(o);
+            bytes = bos.toByteArray();
             oos.flush();
-            oos.close();
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            try { if (bos != null) bos.close(); } catch (IOException ignored) {}
+            try { if (oos != null) oos.close(); } catch (IOException ignored) {}
         }
 
-        return bos.toByteArray();
+        return bytes;
     }
 
-    public static <T> T ToObject(byte[] b) {
+    public static <T> T toObject(byte[] b) {
         T obj = null;
 
         ByteArrayInputStream bis =null;
-        ObjectInput in = null;
+        ObjectInput ois = null;
+
         try {
             bis = new ByteArrayInputStream(b);
-            in = new ObjectInputStream(bis);
-            obj = (T)in.readObject();
+            ois = new ObjectInputStream(bis);
+            obj = (T)ois.readObject();
         } catch(Exception e) {
             e.printStackTrace();
+        } finally {
+            try { if (bis != null) bis.close(); } catch (IOException ignored) {}
+            try { if (ois != null) ois.close(); } catch (IOException ignored) {}
         }
 
         return obj;
     }
-
 
     public static byte[] hashPubKey(byte[] pubkey) {
         return new byte[]{};

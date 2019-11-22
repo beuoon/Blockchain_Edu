@@ -1,4 +1,4 @@
-package event;
+package node.event;
 
 public class EventArgs {
 }

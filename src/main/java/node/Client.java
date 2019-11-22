@@ -1,7 +1,8 @@
-package network;
+package node;
 
-import event.Event;
-import event.MessageEventArgs;
+import node.event.Event;
+import node.event.EventHandler;
+import node.event.MessageEventArgs;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -16,7 +17,9 @@ public class Client extends Thread {
     private DataInputStream input;
     private DataOutputStream output;
 
-    public Client(Socket socket, int port) {
+    private Event<MessageEventArgs> event = new Event<>();
+
+    public Client(Socket socket, int port, EventHandler handler) {
         this.port = port;
         this.socket = socket;
 
@@ -28,20 +31,22 @@ public class Client extends Thread {
                 this.socket.close();
             } catch (IOException ignored) { }
         }
+
+        event.addEventHandler(handler);
     }
 
     @Override
     public void run() {
-        Event<MessageEventArgs> event = new Event<MessageEventArgs>();
-
         byte[] buff = new byte[BUFF_SIZE];
         int buffLen;
+
         try {
             while (true) {
                 if ((buffLen = input.read(buff)) == -1) break;
 
                 byte[] message = new byte[buffLen];
                 System.arraycopy(buff, 0, message, 0, buffLen);
+
                 event.raiseEvent(this, new MessageEventArgs(message));
 
                 sleep(100);
