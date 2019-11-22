@@ -1,8 +1,8 @@
+package utils;
+
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -77,6 +77,7 @@ public class Utils {
 
         return bos.toByteArray();
     }
+
 
     public static byte[] hashPubKey(byte[] pubkey) {
         return new byte[]{};

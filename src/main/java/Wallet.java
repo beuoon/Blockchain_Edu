@@ -1,5 +1,5 @@
 import org.bitcoinj.core.Base58;
-import org.bouncycastle.crypto.digests.RIPEMD160Digest;
+import utils.Utils;
 
 import java.security.*;
 import java.security.spec.ECGenParameterSpec;
