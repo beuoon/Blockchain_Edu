@@ -1,7 +1,8 @@
-package network;
+package node;
 
-import event.Event;
-import event.MessageEventArgs;
+import node.event.Event;
+import node.event.EventHandler;
+import node.event.MessageEventArgs;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -16,7 +17,9 @@ public class Client extends Thread {
     private DataInputStream input;
     private DataOutputStream output;
 
-    public Client(Socket socket, int port) {
+    private Event<MessageEventArgs> event = new Event<>();
+
+    public Client(Socket socket, int port, EventHandler handler) {
         this.port = port;
         this.socket = socket;
 
@@ -29,22 +32,26 @@ public class Client extends Thread {
             } catch (IOException ignored) { }
         }
 
-        if (port != -1) System.out.println("소켓 연결 - " + port);
+        event.addEventHandler(handler);
     }
 
     @Override
     public void run() {
-        Event<MessageEventArgs> event = new Event<MessageEventArgs>();
+        byte[] buff = new byte[BUFF_SIZE];
+        int buffLen;
 
         try {
             while (true) {
-                byte[] buff = new byte[BUFF_SIZE];
-                input.read(buff);
-                event.raiseEvent(this, new MessageEventArgs(buff));
-            }
-        } catch (Exception ignored) { }
+                if ((buffLen = input.read(buff)) == -1) break;
 
-        close();
+                byte[] message = new byte[buffLen];
+                System.arraycopy(buff, 0, message, 0, buffLen);
+
+                event.raiseEvent(this, new MessageEventArgs(message));
+
+                sleep(100);
+            }
+        } catch (Exception ignored) {}
     }
 
     public void send(byte[] buff) {
@@ -56,18 +63,15 @@ public class Client extends Thread {
         }
     }
 
-
     public void close() {
         try {
             input.close();
             output.close();
-        } catch (IOException ignored) { }
+        } catch (IOException ignored) {}
 
         try {
             if (!socket.isClosed())
                 socket.close();
-        } catch (IOException ignored) { }
-
-        System.out.println("클라이언트 종료");
+        } catch (IOException ignored) {}
     }
 }

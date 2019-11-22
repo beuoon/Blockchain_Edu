@@ -1,4 +1,6 @@
-package network;
+package node;
+
+import node.event.EventHandler;
 
 import java.io.IOException;
 import java.lang.Thread.State;
@@ -6,7 +8,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Random;
 
 public class Network {
@@ -16,14 +17,16 @@ public class Network {
 
     private Server server;
     private ArrayList<Client> clients = new ArrayList();
+    private EventHandler handler;
 
-    public Network(int number) throws Exception {
+    public Network(int number, EventHandler handler) throws Exception {
         Random rand = new Random();
         int connNum = rand.nextInt(MAX_CONNECT_NUM-MIN_CONNECT_NUM) + MIN_CONNECT_NUM;
         if (connNum > number) connNum = number;
 
-        HashSet<Integer> bUsePort = new HashSet();
-        System.out.println(number + " 연결 !!");
+        HashSet<Integer> bUsePort = new HashSet<>();
+
+        this.handler = handler;
 
         while(connNum > 0) {
             int port = BASE_PORT + rand.nextInt(number);
@@ -32,7 +35,7 @@ public class Network {
 
             try {
                 Socket socket = new Socket("localhost", port);
-                Client client = new Client(socket, port);
+                Client client = new Client(socket, port, handler);
                 client.start();
                 clients.add(client);
             } catch (Exception ignored) {}
@@ -44,10 +47,7 @@ public class Network {
         server.start();
     }
 
-    public void sendAll(byte[] buff) {
-        for (Client client : clients)
-            client.send(buff);
-    }
+    public ArrayList<Client> getClients() { return clients; }
 
     public boolean checkConnection() {
         if (server.getState() == State.TERMINATED)
@@ -64,10 +64,18 @@ public class Network {
     }
 
     public void close() {
-        this.server.close();
+        try {
+            server.close();
+            server.join();
+        } catch (InterruptedException ignored) {}
 
-        for (Client client : clients)
-            client.close();
+        for (int i = 0; i < clients.size(); i++) {
+            Client client = clients.get(i);
+            try {
+                client.close();
+                client.join();
+            } catch (InterruptedException ignored) {}
+        }
     }
 
     private class Server extends Thread {
@@ -81,7 +89,7 @@ public class Network {
             try {
                 while(true) {
                     Socket clientSocket = socket.accept();
-                    Client client = new Client(clientSocket, -1);
+                    Client client = new Client(clientSocket, -1, handler);
                     client.start();
                     clients.add(client);
                 }
@@ -92,10 +100,8 @@ public class Network {
 
         public void close() {
             try {
-                if (!this.socket.isClosed()) {
+                if (!this.socket.isClosed())
                     this.socket.close();
-                    System.out.println("서버 종료");
-                }
             } catch (IOException ignored) {}
         }
     }

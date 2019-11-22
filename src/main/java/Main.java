@@ -1,16 +1,20 @@
 import DB.Db;
 import blockchain.Blockchain;
 import blockchain.wallet.Wallets;
+import org.bitcoinj.core.Base58;
+
+import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String args[]) throws Exception{
-
         Db db = new Db();
         Wallets wallets = new Wallets();
         String address1 = wallets.createWallet();
         String address2 = wallets.createWallet();
         String address3 = wallets.createWallet();
-
 
         //create blockchain
         Blockchain bc = new Blockchain(address1, db);
@@ -21,7 +25,7 @@ public class Main {
         Functions.getBalance(address3, bc);
 
 
-        Functions.send(wallets.getWallet(address1), address2, 10, bc);
+        Functions.send(wallets.getWallet(address1), address2, 30, bc);
 
         Functions.getBalance(address1, bc);
         Functions.getBalance(address2, bc);
@@ -34,15 +38,14 @@ public class Main {
         Functions.getBalance(address3, bc);
 
 
-        Functions.send(wallets.getWallet(address1), address3, 10, bc);
+        Functions.send(wallets.getWallet(address1), address3, 30, bc);
 
         Functions.getBalance(address1, bc);
         Functions.getBalance(address2, bc);
         Functions.getBalance(address3, bc);
 
-
-
-/*        blockchain.wallet.Wallets wallets = new blockchain.wallet.Wallets();
+/*
+        Wallets wallets = new Wallets();
         ArrayList<String> addressArr = new ArrayList<>();
         ArrayList<Node> nodes = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
@@ -54,7 +57,16 @@ public class Main {
             nodes.add(node);
         }
 
+        // Test
+        nodes.get(0);
+
+        Scanner scan = new Scanner(System.in);
+        scan.next();
+
         for (Node node: nodes)
-            node.close();*/
+            node.close();
+
+        for (Node node: nodes)
+            node.join();*/
     }
 }
