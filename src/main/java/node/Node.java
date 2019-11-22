@@ -4,6 +4,7 @@ import DB.Db;
 import blockchain.*;
 import blockchain.transaction.Transaction;
 import blockchain.transaction.TxInput;
+import blockchain.transaction.TxOutput;
 import blockchain.transaction.UTXOSet;
 import blockchain.wallet.Wallet;
 import blockchain.wallet.Wallets;
@@ -28,7 +29,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     // Blockchain
     private Db db;
     private Blockchain bc;
-    private Mempool<String, Transaction> mempool = new Mempool<>();
+    private HashMap<String, Transaction> mempool = new HashMap<>();
     private HashSet<String> invBlock = new HashSet<>(), invTx = new HashSet<>();
 
     // Network
@@ -37,6 +38,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     public Node() throws Exception {
         wallets = new Wallets();
         this.db = new Db();
+
         number = NodeCount++;
         this.network = new Network(number, this);
     }
@@ -69,12 +71,15 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     }
 
     // TEST
-    public void send(String to, int amount) throws Exception {
+    public void send(String to, int amount) {
         UTXOSet utxoSet = new UTXOSet(bc);
-        Transaction tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
-
-        mempool.put(Utils.byteArrayToHexString(tx.getId()), tx);
-        network.broadcast(tx);
+        try {
+            Transaction tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
+            mempool.put(Utils.byteArrayToHexString(tx.getId()), tx);
+            network.broadcast(tx);
+        } catch (Exception e) {
+            System.out.println("잔고가 부족합니다!!");
+        }
     }
 
     public void checkBalance() {
@@ -83,12 +88,23 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     }
 
     public void run() {
+        if (!bc.validate()) {
+            while (bLoop && !bc.validate()) {
+                Random random = new Random();
+                ArrayList<Client> clients = network.getClients();
+                Client client = clients.get(random.nextInt(clients.size()));
+
+                network.sendGetBlocks(client);
+                try {
+                    sleep(1000);
+                } catch (InterruptedException ignored) {}
+            }
+        }
 
         while (bLoop) {
             try {
                 sleep(100L);
-            } catch (InterruptedException ignored) {
-            }
+            } catch (InterruptedException ignored) {}
 
             if (!network.checkConnection()) {
                 network.close();
@@ -105,7 +121,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     }
 
     private void mineBlock() {
-        if (!bc.validate()) return; // blockchain 준비 안됨
+        if (!bc.validate()) return ; // blockchain 준비 안됨
 
         // Transaction 준비
         Transaction[] txs = null;
@@ -174,11 +190,11 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // 블록 전파
         for (Client client : network.getClients())
-            network.sendInv(client, Network.TYPE.BLOCK, new byte[][]{newBlock.getHash()});
+            network.sendInv(client, Network.TYPE.BLOCK, newBlock.getHash());
     }
 
     public void eventReceived(Object sender, MessageEventArgs e) {
-        Client client = (Client) sender;
+        Client client = (Client)sender;
         byte[] buff = e.getMessage();
         this.handleConnection(client, buff, this.bc);
     }
@@ -189,80 +205,114 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
     private void handleBlock(byte[] data, Blockchain bc) {
         Block block = Utils.toObject(data);
-        if (!bc.validate()) return;
-        if (!bc.addBlock(block)) return;
-        // UTXO reindex
-        UTXOSet utxoSet = new UTXOSet(bc);
-        utxoSet.update(block);
+
+        invBlock.remove(Utils.byteArrayToHexString(block.getHash()));
+
+        if (!bc.validate()) {
+            if (!bc.addBlock(block)) {
+                return ;
+            }
+
+            // UTXO reindex
+            UTXOSet utxoSet = new UTXOSet(bc);
+            utxoSet.reIndex();
+        }
+        else {
+            if (!bc.addBlock(block))
+                return;
+
+            // UTXO update
+            UTXOSet utxoSet = new UTXOSet(bc);
+            utxoSet.update(block);
+        }
+
 
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())
             mempool.remove(Utils.byteArrayToHexString(tx.getId()));
-
-
     }
 
     private void handleInv(Client client, byte[] data, Blockchain bc) {
         int TYPE = data[0];
-        byte[] items = Arrays.copyOfRange(data, 1, data.length-1);
+        byte[] items = Arrays.copyOfRange(data, 1, data.length);
 
         switch(TYPE){
             case Network.TYPE.BLOCK:
                 for (int i = 0; i < items.length; i += 32) {
-                    byte[] item = new byte[32];
-                    System.arraycopy(items, i, item, 0, 32);
+                    byte[] item = Arrays.copyOfRange(items, i, i+32);
 
                     String hash = Utils.byteArrayToHexString(item);
 
                     if (!invBlock.contains(hash) && bc.findBlock(item) == null)
-                        invBlock.add(hash);
+                        network.sendGetData(client, Network.TYPE.BLOCK, item); // invBlock.add(hash);
                 }
                 break;
 
             case Network.TYPE.TX:
                 for (int i = 0; i < items.length; i += 32) {
-                    byte[] item = new byte[32];
-                    System.arraycopy(items, i, item, 0, 32);
+                    byte[] item = Arrays.copyOfRange(items, i, i+32);
 
                     String hash = Utils.byteArrayToHexString(item);
 
-                    if (!invTx.contains(hash) && !mempool.containsKey(hash) && bc.findTransaction(item) == null)
+                    if (!invTx.contains(hash) && !mempool.containsKey(hash) && bc.findTransaction(item) == null) {
                         invTx.add(hash);
+                        network.sendGetData(client, Network.TYPE.TX, item);
+                    }
                 }
                 break;
         }
     }
+    private void handleGetBlocks(Client client, Blockchain bc) {
+        Iterator<Block> iter = bc.iterator();
+        ArrayList<byte[]> blockHashes = new ArrayList<>();
 
-    private void handleGetBlocks(Client client, byte[] data, Blockchain bc) {
+        while (iter.hasNext()) {
+            Block block = iter.next();
+            blockHashes.add(block.getHash());
+        }
+
+        byte[] data = Utils.bytesConcat(blockHashes.toArray(new byte[][]{}));
+
+        network.sendInv(client, Network.TYPE.BLOCK, data);
     }
-
     private void handleGetData(Client client, byte[] data, Blockchain bc) {
         int TYPE = data[0];
-        byte[] hashByte = Arrays.copyOfRange(data, 1, data.length-1);
+        byte[] hash = Arrays.copyOfRange(data, 1, data.length);
 
-        String hash = Utils.byteArrayToHexString(hashByte);
+        switch (TYPE) {
+            case Network.TYPE.BLOCK:
+                Block block = bc.findBlock(hash);
 
-        if (TYPE == Network.TYPE.BLOCK) {
-            bc.findBlock(hashByte);
-        } else if (TYPE == Network.TYPE.TX) {
+                if (block != null)
+                    network.sendBlock(client, block);
+                break;
+            case Network.TYPE.TX:
+                String id = Utils.byteArrayToHexString(hash);
+                Transaction tx = null;
 
+                if (mempool.containsKey(id))
+                    tx = mempool.get(id);
+                else
+                    tx = bc.findTransaction(hash);
+
+                if (tx != null)
+                    network.sendTx(client, tx);
         }
     }
-
     private void handleTx(Client sendClient, byte[] data, Blockchain bc) {
         Transaction tx = Utils.toObject(data);
-
-
         String id = Utils.byteArrayToHexString(tx.getId());
+
+        invTx.remove(id);
+
         if (!mempool.containsKey(id)) {
             mempool.put(id, tx);
-            System.out.printf("recived(%d)[%d]: %s\n", number, mempool.size(), id);
+            System.out.println(number + ": " + id);
 
             // 전파
             for (Client client : network.getClients()) {
                 if (client.equals(sendClient)) continue;
-                network.sendTx(client, tx);
-                // sendInv(client, InvType.Tx, new byte[][]{tx.getId()});
+                network.sendInv(client, Network.TYPE.TX, tx.getId());
             }
         }
     }
@@ -272,50 +322,39 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
     private void handleConnection(Client client, byte[] buff, Blockchain bc) {
         int TYPE = buff[0];
-        byte[] data = Arrays.copyOfRange(buff, 1, buff.length-1);
+        byte[] data = Arrays.copyOfRange(buff, 1, buff.length);
 
         switch (TYPE) {
-           case Network.TYPE.BLOCK:
-                handleBlock(data, bc);
-                break;
-            case Network.TYPE.INV:
-                handleInv(client, data, bc);
-                break;
-            case Network.TYPE.GETBLOCK:
-                handleGetBlocks(client, data, bc);
-                break;
-            case Network.TYPE.GETDATA:
-                handleGetData(client, data, bc);
-                break;
-            case Network.TYPE.TX:
-                handleTx(client, data, bc);
-                break;
-            case Network.TYPE.VERSION:
-                handleVersion(data, bc);
-                break;
+            case Network.TYPE.BLOCK:    handleBlock(data, bc);              break;
+            case Network.TYPE.INV:      handleInv(client, data, bc);        break;
+            case Network.TYPE.GETBLOCK: handleGetBlocks(client, bc);        break;
+            case Network.TYPE.GETDATA:  handleGetData(client, data, bc);    break;
+            case Network.TYPE.TX:       handleTx(client, data, bc);         break;
+            case Network.TYPE.VERSION:  handleVersion(data, bc);            break;
         }
     }
 
     private void getInv() {
+        Random random = new Random();
+        ArrayList<Client> clients = network.getClients();
+        if (clients.size() <= 0) return ;
+
         Iterator<String> blockIter = invBlock.iterator();
         if (blockIter.hasNext()) {
             String hash = blockIter.next();
 
-            Random random = new Random();
-            ArrayList<Client> clients = network.getClients();
             Client client = clients.get(random.nextInt(clients.size()));
             network.sendGetData(client, Network.TYPE.BLOCK, Utils.hexStringToByteArray(hash));
+            // invBlock.remove(hash);
         }
 
         Iterator<String> txIter = invTx.iterator();
         if (txIter.hasNext()) {
             String hash = txIter.next();
 
-            Random random = new Random();
-            ArrayList<Client> clients = network.getClients();
             Client client = clients.get(random.nextInt(clients.size()));
             network.sendGetData(client, Network.TYPE.TX, Utils.hexStringToByteArray(hash));
-            invTx.remove(hash);
+            // invTx.remove(hash);
         }
     }
 }

@@ -3,15 +3,15 @@ package node.network;
 import node.event.Event;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;
+import utils.Utils;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.Arrays;
 
 public class Client extends Thread {
-    private static final int BUFF_SIZE = 1000;
-
     public int port;
     private Socket socket;
     private DataInputStream input;
@@ -37,15 +37,17 @@ public class Client extends Thread {
 
     @Override
     public void run() {
-        byte[] buff = new byte[BUFF_SIZE];
-        int buffLen;
-
         try {
             while (true) {
-                if ((buffLen = input.read(buff)) == -1) break;
+                int readLen;
 
-                byte[] message = new byte[buffLen];
-                System.arraycopy(buff, 0, message, 0, buffLen);
+                byte[] integerBuff = new byte[81];
+                if ((readLen = input.read(integerBuff)) == -1) break;
+                int messageLen = Utils.toObject(integerBuff);
+
+                byte[] message = new byte[messageLen];
+                if ((readLen = input.read(message)) == -1) break;
+                if (readLen != messageLen) continue;
 
                 event.raiseEvent(this, new MessageEventArgs(message));
 
@@ -56,7 +58,8 @@ public class Client extends Thread {
 
     public void send(byte[] buff) {
         try {
-            output.write(buff);
+            byte[] len = Utils.toBytes(new Integer(buff.length));
+            output.write(Utils.bytesConcat(len, buff));
             output.flush();
         } catch (IOException ignored) {
             close();
