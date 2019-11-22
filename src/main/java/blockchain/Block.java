@@ -32,15 +32,7 @@ public class Block implements Serializable{
 
     //bytes to block
     public Block(byte[] b) {
-        final ByteArrayInputStream bis = new ByteArrayInputStream(b);
-        ObjectInputStream ois = null;
-        Block block = null;
-        try {
-            ois = new ObjectInputStream(bis);
-            block = (Block) ois.readObject();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        Block block = Utils.toObject(b);
 
         this.timestamp = block.timestamp;
         this.transactions = block.transactions;
@@ -51,10 +43,6 @@ public class Block implements Serializable{
 
     public byte[] getBytesExceptHash() {
         return Utils.bytesConcat(String.valueOf(timestamp).getBytes(), Utils.sha256(Utils.toBytes(transactions)), prevBlockHash);
-    }
-
-    public long getTimestamp() {
-        return timestamp;
     }
 
     public byte[] getPrevBlockHash() {

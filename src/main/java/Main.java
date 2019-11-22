@@ -54,8 +54,10 @@ public class Main {
         ArrayList<Node> nodes = new ArrayList<>();
 
         Node firstNode = new Node();
+        firstNode.createWallet();
+        firstNode.createGenesisBlock(firstNode.getWallet().getAddress());
         firstNode.start();
-        addressArr.add(firstNode.getAddress());
+        addressArr.add(firstNode.getWallet().getAddress());
         nodes.add(firstNode);
 
         System.out.println("제네시스 블록 만들때까지 대기..");
@@ -63,15 +65,16 @@ public class Main {
 
         for (int i = 1; i < 10; i++) {
             Node node = new Node();
+            node.createWallet();
+            node.createNullBlockchain();
             node.start();
-
-            addressArr.add(node.getAddress());
+            addressArr.add(node.getWallet().getAddress());
             nodes.add(node);
         }
 
         // Test
-        nodes.get(0).send(nodes.get(1).getAddress(), 5);
-        nodes.get(0).send(nodes.get(2).getAddress(), 5);
+        nodes.get(0).send(nodes.get(1).getWallet().getAddress(), 5);
+        nodes.get(0).send(nodes.get(2).getWallet().getAddress(), 5);
 
         System.out.println("블록 만들때까지 대기..");
         Thread.sleep(1000);
