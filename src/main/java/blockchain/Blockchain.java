@@ -36,7 +36,6 @@ public class Blockchain {
         this.tip = null;
     }
 
-
     public Block mineBlock(Transaction[] transactions) {
         Bucket bucket = db.getBucket("blocks");
         byte[] lastHash = bucket.get("l");
@@ -241,7 +240,7 @@ public class Blockchain {
 
         return true;
     }
-    public boolean verifyTransaction(Transaction tx) throws Exception {
+    public boolean verifyTransaction(Transaction tx) {
         if(tx.isCoinBase()) return true;
 
         HashMap<String, Transaction> prevTxs = new HashMap<>();

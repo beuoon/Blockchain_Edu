@@ -1,4 +1,4 @@
-package node;
+package node.network;
 
 import node.event.Event;
 import node.event.EventHandler;
@@ -74,4 +74,6 @@ public class Client extends Thread {
                 socket.close();
         } catch (IOException ignored) {}
     }
+
+
 }

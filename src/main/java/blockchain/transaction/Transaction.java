@@ -64,13 +64,12 @@ public class Transaction implements Serializable {
         }
     }
 
-    public boolean Verify(HashMap<String,Transaction> prevTxs) throws Exception {
+    public boolean Verify(HashMap<String,Transaction> prevTxs) {
         if(isCoinBase()) return true;
 
         for(TxInput vin : Vin) {
             if(prevTxs.get(Utils.byteArrayToHexString(vin.getTxId())) == null){
-                throw new Exception("ERROR: Rrevious transaction is not correct");
-            }
+                new Exception("ERROR: Rrevious transaction is not correct").printStackTrace();            }
         }
 
         Transaction txCopy = trimmedCopy();
@@ -80,10 +79,17 @@ public class Transaction implements Serializable {
             Transaction prevTx = prevTxs.get(Utils.byteArrayToHexString(vin.getTxId()));
             byte[] digest = Utils.sha256(Utils.bytesConcat(Utils.toBytes(txCopy.Hash()), prevTx.getVout().get(vin.getvOut()).getPublicKeyHash()));
 
-            Signature sig = Signature.getInstance("SHA256withECDSA");
-            sig.initVerify(Vin.get(i).getPubKey());
-            sig.update(digest);
-            if(!sig.verify(Vin.get(i).getSignature())) return false;
+            boolean v = false;
+            try {
+                Signature sig = Signature.getInstance("SHA256withECDSA");
+                sig.initVerify(Vin.get(i).getPubKey());
+                sig.update(digest);
+                v = sig.verify(Vin.get(i).getSignature());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if(!v) return false;
         }
         return true;
     }
@@ -122,25 +128,5 @@ public class Transaction implements Serializable {
 
     public ArrayList<TxOutput> getVout() {
         return Vout;
-    }
-
-    public static Transaction bytesToTx(byte[] bytes) {
-        ByteArrayInputStream bis = null;
-        ObjectInputStream ois = null;
-
-        Transaction tx = null;
-
-        try {
-            bis = new ByteArrayInputStream(bytes);
-            ois = new ObjectInputStream(bis);
-            tx = (Transaction)ois.readObject();
-            ois.close();
-        } catch (Exception ignored) {
-        } finally {
-            if (bis != null) try { bis.close(); } catch (IOException ignored) {}
-            if (ois != null) try { ois.close(); } catch (IOException ignored) {}
-        }
-
-        return tx;
     }
 }
