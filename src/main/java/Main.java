@@ -1,3 +1,8 @@
+import DB.Db;
+import blockchain.Blockchain;
+import blockchain.wallet.Wallets;
+import blockchain.Functions;
+import node.Node;
 import org.bitcoinj.core.Base58;
 
 import java.security.PublicKey;
@@ -6,7 +11,7 @@ import java.util.Iterator;
 import java.util.Scanner;
 
 public class Main {
-    public static void main(String args[]) throws Exception{
+    public static void main(String args[]) throws Exception {
         /*
         Db db = new Db();
         Wallets wallets = new Wallets();

@@ -1,3 +1,5 @@
+package blockchain;
+
 import blockchain.Block;
 import blockchain.Blockchain;
 import blockchain.transaction.Transaction;

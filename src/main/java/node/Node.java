@@ -3,6 +3,8 @@ package node;
 import DB.Db;
 import blockchain.*;
 import blockchain.transaction.Transaction;
+import blockchain.transaction.TxOutput;
+import blockchain.transaction.UTXOSet;
 import blockchain.wallet.Wallets;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;
@@ -20,16 +22,16 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private int number;
     private boolean bLoop = true;
 
-    // blockchain.Wallet
+    // Wallet
     private Wallets wallets;
     private String address;
 
-    // blockchain.Blockchain
+    // Blockchain
     private Db db;
     private Blockchain bc;
     private HashMap<String, Transaction> mempool = new HashMap<>();
 
-    // blockchain.Network
+    // Network
     private static final int COMMAND_LEN = 13, DATA_TYPE_LEN = 5;
     private Network network;
 
@@ -55,12 +57,13 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
     // TEST
     public void send(String to, int amount) throws Exception {
-        Transaction tx = bc.newUTXOTransaction(wallets.getWallet(address), to, amount);
+        UTXOSet utxoSet = new UTXOSet(bc);
+        Transaction tx = bc.newUTXOTransaction(wallets.getWallet(address), to, amount, utxoSet);
 
         try {
             mempoolSem.acquire();
             try {
-                mempool.put(new String(tx.getId()), tx);
+                mempool.put(Base58.encode(tx.getId()), tx);
             } catch (Exception ignored) {}
             finally {
                 mempoolSem.release();
@@ -71,11 +74,13 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             sendTx(client, tx);
     }
     public void checkBalance() throws Exception {
+        UTXOSet utxoSet = new UTXOSet(bc);
         byte[] pubkeyHash = Base58.decode(address);
         pubkeyHash = Arrays.copyOfRange(pubkeyHash, 1, pubkeyHash.length - 4);
-        ArrayList<TxOutput> UTOXs = bc.findUTXO(pubkeyHash);
+        ArrayList<TxOutput> UTOXs = utxoSet.findUTXO(pubkeyHash);
 
         int balance = 0;
+
         for(TxOutput out : UTOXs)
             balance += out.getValue();
 
@@ -86,47 +91,76 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     public void run() {
 
         while (bLoop) {
+            try {
+                sleep(100L);
+            } catch (InterruptedException ignored) {
+            }
+
             if (!network.checkConnection()) {
                 network.close();
                 bLoop = false;
                 break;
             }
 
-            // mempool
-            try {
-                mempoolSem.acquire();
-                try {
-                    if (mempool.size() >= 2) {
-                        int txLen = mempool.size();
-                        Transaction[] txs = new Transaction[txLen+1];
-                        Iterator<Transaction> iter = mempool.values().iterator();
-
-                        for (int i = 0; i < txLen && iter.hasNext(); i++)
-                            txs[i] = iter.next();
-                        txs[txLen] = new Transaction(address, "");
-                        mempool.clear();
-
-                        Block newBlock = bc.MineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
-
-                        // TODO: UTXOSet Reindex
-
-                        for (Client client : network.getClients())
-                            sendInv(client, InvType.Tx, new byte[][]{newBlock.getHash()});
-                    }
-                } catch (Exception ignored) {}
-                finally {
-                    mempoolSem.release();
-                }
-            } catch (InterruptedException ignored) {}
-
-            // sleep
-            try {
-                sleep(100L);
-            } catch (InterruptedException ignored) {}
+            mineBlock();
         }
 
         if (network.checkConnection())
             network.close();
+    }
+
+    private void mineBlock() {
+        // Transaction 준비
+        Transaction[] txs = null;
+        try {
+            mempoolSem.acquire();
+            try {
+                if (mempool.size() >= 2) {
+                    int txLen = mempool.size();
+                    txs = new Transaction[txLen + 1];
+                    Iterator<Transaction> iter = mempool.values().iterator();
+
+                    for (int i = 0; i < txLen && iter.hasNext(); i++)
+                        txs[i] = iter.next();
+                    txs[txLen] = new Transaction(address, "");
+                }
+            } catch (Exception ignored) {
+            } finally {
+                mempoolSem.release();
+            }
+        } catch (InterruptedException ignored) {
+        }
+
+        if (txs == null) return ; // 채굴 안함
+
+        Block newBlock = null;
+        try {
+            newBlock = bc.MineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (newBlock == null) return ; // 채굴 실패
+
+        // UTXO reindex
+        UTXOSet utxoSet = new UTXOSet(bc);
+        utxoSet.reIndex();
+
+        // 블록내 트랜잭션 pool 에서 제거
+        try {
+            mempoolSem.acquire();
+            try {
+                for (Transaction tx : newBlock.getTransactions())
+                    mempool.remove(Base58.encode(tx.getId()));
+            } catch (Exception ignored) {
+            } finally {
+                mempoolSem.release();
+            }
+        } catch (InterruptedException ignored) {}
+
+        // 블록 전파
+        for (Client client : network.getClients())
+            sendInv(client, InvType.Tx, new byte[][]{newBlock.getHash()});
     }
 
     public void eventReceived(Object sender, MessageEventArgs e) {
@@ -200,6 +234,22 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // TODO: bc.addBlock(block);
 
+        // UTXO reindex
+        UTXOSet utxoSet = new UTXOSet(bc);
+        utxoSet.reIndex();
+
+        // 블록내 트랜잭션 pool 에서 제거
+        try {
+            mempoolSem.acquire();
+            try {
+                for (Transaction tx : block.getTransactions())
+                    mempool.remove(Base58.encode(tx.getId()));
+            } catch (Exception ignored) {
+            } finally {
+                mempoolSem.release();
+            }
+        } catch (InterruptedException ignored) {}
+
     }
     private void handleInv(byte[] data, Blockchain bc) {
     }
@@ -213,10 +263,10 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         try {
             mempoolSem.acquire();
             try {
-                String id = new String(tx.getId());
+                String id = Base58.encode(tx.getId());
                 if (!mempool.containsKey(id)) {
                     mempool.put(id, tx);
-                    System.out.printf("recived(%d): %s\n", number, id);
+                    System.out.printf("recived(%d)[%d]: %s\n", number, mempool.size(), id);
 
                     // 전파
                     for (Client client : network.getClients()) {
