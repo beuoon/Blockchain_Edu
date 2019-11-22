@@ -59,7 +59,7 @@ public class Main {
         nodes.add(firstNode);
 
         System.out.println("제네시스 블록 만들때까지 대기..");
-        Thread.sleep(100);
+        Thread.sleep(500);
 
         for (int i = 1; i < 10; i++) {
             Node node = new Node();
@@ -74,7 +74,7 @@ public class Main {
         nodes.get(0).send(nodes.get(2).getAddress(), 5);
 
         System.out.println("블록 만들때까지 대기..");
-        Thread.sleep(100);
+        Thread.sleep(1000);
 
         for (Node node: nodes)
             node.checkBalance();

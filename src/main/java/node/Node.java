@@ -12,10 +12,7 @@ import node.event.MessageEventArgs;
 import org.bitcoinj.core.Base58;
 import utils.Utils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 
 public class Node extends Thread implements EventHandler<MessageEventArgs> {
@@ -31,6 +28,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private Db db;
     private Blockchain bc;
     private HashMap<String, Transaction> mempool = new HashMap<>();
+    private HashSet<String> invBlock = new HashSet<>(), invTx = new HashSet<>();
 
     // Network
     private Network network;
@@ -63,7 +61,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         try {
             mempoolSem.acquire();
             try {
-                mempool.put(Base58.encode(tx.getId()), tx);
+                mempool.put(Utils.byteArrayToHexString(tx.getId()), tx);
             } catch (Exception ignored) {}
             finally {
                 mempoolSem.release();
@@ -102,6 +100,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
                 break;
             }
 
+            getInv();
             mineBlock();
         }
 
@@ -109,6 +108,28 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             network.close();
     }
 
+    private void getInv() {
+        Iterator<String> blockIter = invBlock.iterator();
+        if (blockIter.hasNext()) {
+            String hash = blockIter.next();
+
+            Random random = new Random();
+            ArrayList<Client> clients = network.getClients();
+            Client client = clients.get(random.nextInt(clients.size()));
+            sendGetData(client, InvType.Block, Utils.hexStringToByteArray(hash));
+        }
+
+        Iterator<String> txIter = invTx.iterator();
+        if (txIter.hasNext()) {
+            String hash = txIter.next();
+
+            Random random = new Random();
+            ArrayList<Client> clients = network.getClients();
+            Client client = clients.get(random.nextInt(clients.size()));
+            sendGetData(client, InvType.Tx, Utils.hexStringToByteArray(hash));
+            invTx.remove(hash);
+        }
+    }
     private void mineBlock() {
         if (!bc.validate()) return ; // blockchain 준비 안됨
 
@@ -125,10 +146,13 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
                     while (iter.hasNext()) {
                         Transaction tx = iter.next();
-                        String key = Base58.encode(tx.getId());
+                        String key = Utils.byteArrayToHexString(tx.getId());
 
                         // tx 검증
-                        if (!bc.VerifyTransaction(tx)) {
+                        if (!bc.validateTransaction(tx)) // TODO: 고아 거래 처리
+                            continue;
+
+                        if (!bc.verifyTransaction(tx)) { // 잘못된 거래
                             mempool.remove(key);
                             continue;
                         }
@@ -167,12 +191,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         if (txs == null) return ; // 채굴 안함
 
-        Block newBlock = null;
-        try {
-            newBlock = bc.mineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        Block newBlock = bc.mineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
 
         if (newBlock == null) return ; // 채굴 실패
 
@@ -187,7 +206,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             mempoolSem.acquire();
             try {
                 for (Transaction tx : newBlock.getTransactions())
-                    mempool.remove(Base58.encode(tx.getId()));
+                    mempool.remove(Utils.byteArrayToHexString(tx.getId()));
             } catch (Exception ignored) {
             } finally {
                 mempoolSem.release();
@@ -205,9 +224,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         this.handleConnection(client, buff, this.bc);
     }
 
-    public void close() {
-        bLoop = false;
-    }
+    public void close() { bLoop = false; }
 
     private void requestBlocks() {
     }
@@ -242,10 +259,13 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         client.send(command);
     }
-    private void sendGetData(Client client) {
+    private void sendGetData(Client client, InvType invType, byte[] data) {
         byte[] command = new byte[]{CommandType.GetData.getNumber()};
+        byte[] it = new byte[]{invType.getNumber()};
 
-        client.send(command);
+        byte[] buffer = Utils.bytesConcat(command, it, data);
+
+        client.send(buffer);
     }
     private void sendTx(Client client, Transaction tx) {
         byte[] command = new byte[]{CommandType.Tx.getNumber()};
@@ -273,14 +293,14 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // UTXO reindex
         UTXOSet utxoSet = new UTXOSet(bc);
-        utxoSet.reIndex();
+        utxoSet.update(block);
 
         // 블록내 트랜잭션 pool 에서 제거
         try {
             mempoolSem.acquire();
             try {
                 for (Transaction tx : block.getTransactions())
-                    mempool.remove(Base58.encode(tx.getId()));
+                    mempool.remove(Utils.byteArrayToHexString(tx.getId()));
             } catch (Exception ignored) {
             } finally {
                 mempoolSem.release();
@@ -288,11 +308,48 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         } catch (InterruptedException ignored) {}
 
     }
-    private void handleInv(byte[] data, Blockchain bc) {
+    private void handleInv(Client client, byte[] data, Blockchain bc) {
+        InvType it = InvType.valueOf(data[0]);
+        byte[] items = new byte[data.length-1];
+        System.arraycopy(data, 1, items, 0, items.length);
+
+        if (it == InvType.Block) {
+            for (int i = 0; i < items.length; i += 32) {
+                byte[] item = new byte[32];
+                System.arraycopy(items, i, item, 0, 32);
+
+                String hash = Utils.byteArrayToHexString(item);
+
+                if (!invBlock.contains(hash) && bc.findBlock(item) == null)
+                    invBlock.add(hash);
+            }
+        }
+        else if (it == InvType.Tx) {
+            for (int i = 0; i < items.length; i += 32) {
+                byte[] item = new byte[32];
+                System.arraycopy(items, i, item, 0, 32);
+
+                String hash = Utils.byteArrayToHexString(item);
+
+                if (!invTx.contains(hash) && !mempool.containsKey(hash) && bc.findTransaction(item) == null)
+                    invTx.add(hash);
+            }
+        }
     }
     private void handleGetBlocks(Client client, byte[] data, Blockchain bc) {
     }
     private void handleGetData(Client client, byte[] data, Blockchain bc) {
+        InvType it = InvType.valueOf(data[0]);
+        byte[] hashByte = new byte[data.length-1];
+        System.arraycopy(data, 1, hashByte, 0, hashByte.length);
+        String hash = Utils.byteArrayToHexString(hashByte);
+
+        if (it == InvType.Block) {
+            bc.findBlock(hashByte);
+        }
+        else if (it == InvType.Tx) {
+
+        }
     }
     private void handleTx(Client sendClient, byte[] data, Blockchain bc) {
         Transaction tx = Utils.toObject(data);
@@ -300,7 +357,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         try {
             mempoolSem.acquire();
             try {
-                String id = Base58.encode(tx.getId());
+                String id = Utils.byteArrayToHexString(tx.getId());
                 if (!mempool.containsKey(id)) {
                     mempool.put(id, tx);
                     System.out.printf("recived(%d)[%d]: %s\n", number, mempool.size(), id);
@@ -330,7 +387,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         switch(ct) {
             case Block:       handleBlock(data, bc);              break;
-            case Inv:         handleInv(data, bc);                break;
+            case Inv:         handleInv(client, data, bc);                break;
             case GetBlock :   handleGetBlocks(client, data, bc);  break;
             case GetData:     handleGetData(client, data, bc);    break;
             case Tx:          handleTx(client, data, bc);         break;

@@ -21,7 +21,7 @@ public class Blockchain {
         Transaction coinbaseTx = new Transaction(address, genesisCoinbaseData);
         Block genesisBlock = new Block(coinbaseTx); // create genesis block
 
-        db.getBucket("blocks").put(new String(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchain
+        db.getBucket("blocks").put(Utils.byteArrayToHexString(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchain
         db.getBucket("blocks").put("l", genesisBlock.getHash());
 
         this.db = db;
@@ -42,7 +42,7 @@ public class Blockchain {
         byte[] lastHash = bucket.get("l");
 
         Block newBlock = new Block(transactions, lastHash);
-        bucket.put(new String(newBlock.getHash()), Utils.toBytes(newBlock));
+        bucket.put(Utils.byteArrayToHexString(newBlock.getHash()), Utils.toBytes(newBlock));
 
         bucket.put("l", newBlock.getHash());
         this.tip = newBlock.getHash();
@@ -60,7 +60,7 @@ public class Blockchain {
         // 트랜잭션 검증
         for (Transaction tx : block.getTransactions()) {
             try {
-                if (!VerifyTransaction(tx))
+                if (!verifyTransaction(tx))
                     return false;
             } catch (Exception e) { return false; }
         }
@@ -200,6 +200,13 @@ public class Blockchain {
         return tx;
     }
 
+    public Block findBlock(byte[] hash) {
+        Bucket bucket = db.getBucket("blocks");
+        byte[] data = bucket.get(Utils.byteArrayToHexString(hash));
+
+        if (data == null) return null;
+        return Utils.toObject(data);
+    }
     public Transaction findTransaction(byte[] id) {
         Iterator<Block> itr = iterator();
         while(itr.hasNext()){
@@ -224,7 +231,17 @@ public class Blockchain {
         tx.sign(privateKey, prevTxs);
     }
 
-    public boolean VerifyTransaction(Transaction tx) throws Exception {
+    public boolean validateTransaction(Transaction tx) {
+        if(tx.isCoinBase()) return true;
+
+        for(TxInput vin : tx.getVin()) {
+            Transaction prevTx = findTransaction(vin.getTxId());
+            if(prevTx == null) return false;
+        }
+
+        return true;
+    }
+    public boolean verifyTransaction(Transaction tx) throws Exception {
         if(tx.isCoinBase()) return true;
 
         HashMap<String, Transaction> prevTxs = new HashMap<>();
@@ -236,7 +253,6 @@ public class Blockchain {
         }
 
         return tx.Verify(prevTxs);
-
     }
 
     public Db getDb() {
