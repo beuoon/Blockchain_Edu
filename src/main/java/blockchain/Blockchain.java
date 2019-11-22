@@ -1,10 +1,9 @@
-import org.bouncycastle.asn1.teletrust.TeleTrusTNamedCurves;
+package blockchain;
 
-import java.lang.annotation.Target;
-import java.lang.reflect.Array;
+import utils.Utils;
+
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
 
 public class Blockchain {
@@ -30,7 +29,7 @@ public class Blockchain {
     }
 
 
-    public void MineBlock(Transaction[] transactions) throws Exception{
+    public Block MineBlock(Transaction[] transactions) throws Exception{
 
         for(Transaction tx : transactions) {
             if(!VerifyTransaction(tx)){
@@ -44,7 +43,9 @@ public class Blockchain {
         bucket.put(new String(newBlock.getHash()) ,newBlock.toBytes());
 
         bucket.put("l", newBlock.getHash());
-        this.tip = newBlock.getHash();
+        tip = newBlock.getHash();
+
+        return newBlock;
     }
 
     public ArrayList<TxOutput> findUTXO(byte[] pubkeyHash) {

@@ -1,7 +1,8 @@
+package blockchain;
+
+import utils.Utils;
+
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
 
 public class Block implements Serializable{
 
@@ -81,25 +82,5 @@ public class Block implements Serializable{
 
     public Transaction[] getTransactions() {
         return transactions;
-    }
-
-    public static Block bytesToBlock(byte[] bytes) {
-        ByteArrayInputStream bis = null;
-        ObjectInputStream ois = null;
-
-        Block block = null;
-
-        try {
-            bis = new ByteArrayInputStream(bytes);
-            ois = new ObjectInputStream(bis);
-            block = (Block)ois.readObject();
-            ois.close();
-        } catch (Exception ignored) {
-        } finally {
-            if (bis != null) try { bis.close(); } catch (IOException ignored) {}
-            if (ois != null) try { ois.close(); } catch (IOException ignored) {}
-        }
-
-        return block;
     }
 }

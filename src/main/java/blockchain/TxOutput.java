@@ -1,7 +1,8 @@
+package blockchain;
+
 import org.bitcoinj.core.Base58;
 
 import java.io.Serializable;
-import java.security.PublicKey;
 import java.util.Arrays;
 
 public class TxOutput implements Serializable {

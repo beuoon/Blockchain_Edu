@@ -1,3 +1,5 @@
+package blockchain;
+
 import java.util.HashMap;
 
 public class Db {

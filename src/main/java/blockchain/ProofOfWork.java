@@ -1,3 +1,7 @@
+package blockchain;
+
+import utils.Utils;
+
 import java.math.BigInteger;
 
 public class ProofOfWork {

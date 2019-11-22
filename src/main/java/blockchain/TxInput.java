@@ -1,3 +1,7 @@
+package blockchain;
+
+import utils.Utils;
+
 import java.io.Serializable;
 import java.security.PublicKey;
 import java.security.Signature;

@@ -3,9 +3,11 @@ package node;
 import blockchain.*;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;
+import org.bitcoinj.core.Base58;
 import utils.Utils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.Semaphore;
@@ -65,6 +67,17 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
         for (Client client : network.getClients())
             sendTx(client, tx);
     }
+    public void checkBalance() throws Exception {
+        byte[] pubkeyHash = Base58.decode(address);
+        pubkeyHash = Arrays.copyOfRange(pubkeyHash, 1, pubkeyHash.length - 4);
+        ArrayList<TxOutput> UTOXs = bc.findUTXO(pubkeyHash);
+
+        int balance = 0;
+        for(TxOutput out : UTOXs)
+            balance += out.getValue();
+
+        System.out.printf("Balance of '%s' : %d\n", address, balance);
+    }
     public String getAddress() { return address; }
 
     public void run() {
@@ -80,7 +93,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             try {
                 mempoolSem.acquire();
                 try {
-                    if (mempool.size() > 2) {
+                    if (mempool.size() >= 2) {
                         int txLen = mempool.size();
                         Transaction[] txs = new Transaction[txLen+1];
                         Iterator<Transaction> iter = mempool.values().iterator();
@@ -91,6 +104,8 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
                         mempool.clear();
 
                         Block newBlock = bc.MineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
+
+                        // TODO: UTXOSet Reindex
 
                         for (Client client : network.getClients())
                             sendInv(client, InvType.Tx, new byte[][]{newBlock.getHash()});
@@ -179,6 +194,9 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
     private void handleBlock(byte[] data, Blockchain bc) {
         Block block = Utils.toObject(data);
+
+        // TODO: bc.addBlock(block);
+
     }
     private void handleInv(byte[] data, Blockchain bc) {
     }
@@ -193,14 +211,15 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             mempoolSem.acquire();
             try {
                 String id = new String(tx.getId());
-                if (!mempool.containsKey(id) && bc.VerifyTransaction(tx)) {
+                if (!mempool.containsKey(id)) {
                     mempool.put(id, tx);
                     System.out.printf("recived(%d): %s\n", number, id);
 
                     // 전파
                     for (Client client : network.getClients()) {
                         if (client.equals(sendClient)) continue;
-                        sendInv(client, InvType.Tx, new byte[][]{tx.getId()});
+                        sendTx(client, tx);
+                        // sendInv(client, InvType.Tx, new byte[][]{tx.getId()});
                     }
                 }
 
