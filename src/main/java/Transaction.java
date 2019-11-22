@@ -1,7 +1,10 @@
 import java.io.*;
-import java.security.PrivateKey;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
 
 public class Transaction implements Serializable {
 
@@ -21,30 +24,69 @@ public class Transaction implements Serializable {
         }
 
         id = new byte[]{};
-        Vin.add(new TxInput("", -1, new byte[]{}, data.getBytes()));
+        Vin.add(new TxInput(new byte[]{}, -1, null, data.getBytes()));
         Vout.add(new TxOutput(subsidy, to));
 
-        this.setId();
+        setId(Hash());
     }
 
     public Transaction(byte[] id, ArrayList<TxInput> vin, ArrayList<TxOutput> vout) {
         this.id = id;
         this.Vin = vin;
         this.Vout = vout;
-        setId();
+        setId(Hash());
     }
 
-    public void sign(PrivateKey privateKey, HashMap<String, Transaction> prevTxs) {
+    public Transaction(Transaction tx) {
+        this.id = tx.id;
+        this.Vin = tx.Vin;
+        this.Vout = tx.Vout;
+    }
+
+    public byte[] Hash() {
+        return Utils.sha256(Utils.bytesConcat(Utils.toBytes(Vin), Utils.toBytes(Vout)));
+    }
+
+
+    public void sign(PrivateKey privateKey, HashMap<String, Transaction> prevTxs) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
         if(isCoinBase()) return;
 
         Transaction txCopy = trimmedCopy();
         for(int i=0; i<txCopy.getVin().size(); i++) {
             TxInput vin = txCopy.getVin().get(i);
-            Transaction prevTx = prevTxs.get(vin.getTxId());
-            txCopy.getVin().get(i).setSignature(null);
-            txCopy.getVin().get(i).setPubKey(prevTx.getVout().get(vin.getvOut()).getPublicKeyHash());
+            Transaction prevTx = prevTxs.get(Utils.byteArrayToHexString(vin.getTxId()));
+            byte[] digest = Utils.sha256(Utils.bytesConcat(Utils.toBytes(txCopy.Hash()), prevTx.getVout().get(vin.getvOut()).getPublicKeyHash()));
 
+            Signature sig = Signature.getInstance("SHA256withECDSA");
+            sig.initSign(privateKey);
+            sig.update(digest);
+            byte[] signature = sig.sign();
+            Vin.get(i).setSignature(signature);
         }
+    }
+
+    public boolean Verify(HashMap<String,Transaction> prevTxs) throws Exception {
+        if(isCoinBase()) return true;
+
+        for(TxInput vin : Vin) {
+            if(prevTxs.get(Utils.byteArrayToHexString(vin.getTxId())) == null){
+                throw new Exception("ERROR: Rrevious transaction is not correct");
+            }
+        }
+
+        Transaction txCopy = trimmedCopy();
+
+        for(int i=0; i< Vin.size(); i++) {
+            TxInput vin = Vin.get(i);
+            Transaction prevTx = prevTxs.get(Utils.byteArrayToHexString(vin.getTxId()));
+            byte[] digest = Utils.sha256(Utils.bytesConcat(Utils.toBytes(txCopy.Hash()), prevTx.getVout().get(vin.getvOut()).getPublicKeyHash()));
+
+            Signature sig = Signature.getInstance("SHA256withECDSA");
+            sig.initVerify(Vin.get(i).getPubKey());
+            sig.update(digest);
+            if(!sig.verify(Vin.get(i).getSignature())) return false;
+        }
+        return true;
     }
 
     private Transaction trimmedCopy() {
@@ -52,11 +94,11 @@ public class Transaction implements Serializable {
         ArrayList<TxOutput> outputs = new ArrayList<TxOutput>();
 
         for(TxInput vin : Vin) {
-            inputs.add(new TxInput(vin));
+            inputs.add(new TxInput(vin.getTxId(), vin.getvOut(), null, null));
         }
 
         for(TxOutput vout : Vout) {
-            outputs.add(vout);
+            outputs.add(new TxOutput(vout));
         }
 
         return new Transaction(id, inputs, outputs);
@@ -64,13 +106,12 @@ public class Transaction implements Serializable {
 
 
     public boolean isCoinBase() {
-        if(Vin.size() == 1 && Vin.get(0).getTxId().length() == 0 && Vin.get(0).getvOut() == -1) return true;
+        if(Vin.size() == 1 && Vin.get(0).getTxId().length == 0 && Vin.get(0).getvOut() == -1) return true;
         return false;
     }
 
-    private void setId(){
-        byte[] b = Utils.toBytes(Vin, Vout);
-        id = Utils.sha256(b);
+    public void setId(byte[] id){
+        this.id = id;
     }
 
 

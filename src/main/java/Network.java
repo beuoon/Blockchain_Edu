@@ -20,7 +20,7 @@ public class Network {
         Random rand = new Random();
         int connNum = (number > MIN_CONNECT_NUM) ? rand.nextInt(MAX_CONNECT_NUM-MIN_CONNECT_NUM)+MIN_CONNECT_NUM : number;
 
-        HashSet<Integer> bUsePort = new HashSet();
+        HashSet<Integer> bUsePort = new HashSet<>();
         while (connNum > 0) {
             int port = BASE_PORT + rand.nextInt(number);
             if (bUsePort.contains(port)) continue;

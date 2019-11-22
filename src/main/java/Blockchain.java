@@ -1,9 +1,11 @@
+import org.bouncycastle.asn1.teletrust.TeleTrusTNamedCurves;
+
 import java.lang.annotation.Target;
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.*;
 
 public class Blockchain {
 
@@ -29,6 +31,13 @@ public class Blockchain {
 
 
     public void MineBlock(Transaction[] transactions) throws Exception{
+
+        for(Transaction tx : transactions) {
+            if(!VerifyTransaction(tx)){
+                throw new Exception("Eror: Invalid transaction");
+            }
+        }
+
         Db.Bucket bucket = db.getBucket("blocks");
         byte[] lastHash = bucket.get("l");
         Block newBlock = new Block(transactions, lastHash);
@@ -83,9 +92,9 @@ public class Blockchain {
                 if(tx.isCoinBase() == false) {
                     for(TxInput in : tx.getVin()) {
                         if (in.usesKey(pubKeysHash)) {
-                            String inTxId = in.getTxId();
-                            if(spentTxOs.get(inTxId) == null) spentTxOs.put(inTxId, new ArrayList<Integer>());
-                            spentTxOs.get(inTxId).add(in.getvOut());
+                            byte[] inTxId = in.getTxId();
+                            if(spentTxOs.get(Utils.byteArrayToHexString(inTxId)) == null) spentTxOs.put(Utils.byteArrayToHexString(inTxId), new ArrayList<Integer>());
+                            spentTxOs.get(Utils.byteArrayToHexString(inTxId)).add(in.getvOut());
                         }
                     }
                 }
@@ -125,11 +134,11 @@ public class Blockchain {
         return new Pair(accumulated, unspentOutputs);
     }
 
-    public Transaction newUTXOTransaction(Wallet from, String to, int amount) throws Exception{
+    public Transaction newUTXOTransaction(Wallet wallet, String to, int amount) throws Exception{
         ArrayList<TxInput> inputs = new ArrayList();
         ArrayList<TxOutput> outputs = new ArrayList();
 
-        byte[] pubkeyHash = Utils.ripemd160(Utils.sha256(from.getPublicKey().getEncoded()));
+        byte[] pubkeyHash = Utils.ripemd160(Utils.sha256(wallet.getPublicKey().getEncoded()));
         Pair<Integer, HashMap<String, ArrayList<Integer>>> spendableOutputs = findSpendableOutputs(pubkeyHash, amount);
         int acc = spendableOutputs.getKey();
         HashMap<String, ArrayList<Integer>> validOutputs = spendableOutputs.getValue();
@@ -144,19 +153,60 @@ public class Blockchain {
             ArrayList<Integer> outs = validOutputs.get(txid);
 
             for(int out : outs) {
-                TxInput input = new TxInput(txid, out, from.getPublicKey().getEncoded(), new byte[]{0});
+                TxInput input = new TxInput(Utils.hexStringToByteArray(txid), out, wallet.getPublicKey(), null);
                 inputs.add(input);
             }
         }
 
         outputs.add(new TxOutput(amount, to));
         if(acc > amount) {
-            outputs.add(new TxOutput(acc-amount, from.getAddress()));
+            outputs.add(new TxOutput(acc-amount, wallet.getAddress()));
         }
 
         Transaction tx = new Transaction(new byte[]{}, inputs, outputs);
-
+        tx.setId(tx.Hash());
+        signTransaction(tx, wallet.getPrivateKey());
         return tx;
+    }
+
+    public Transaction findTransaction(byte[] id) {
+        Iterator<Block> itr = iterator();
+        while(itr.hasNext()){
+            Block block = itr.next();
+            for(Transaction tx : block.getTransactions()) {
+                if(Arrays.equals(tx.getId(), id)) return tx;
+                if(block.getPrevBlockHash().length == 0) break;
+            }
+        }
+
+        return null;
+    }
+
+    public void signTransaction(Transaction tx, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, InvalidKeySpecException {
+        HashMap<String, Transaction> prevTxs = new HashMap<>();
+
+        for(TxInput vin : tx.getVin()) {
+            Transaction prevTx = new Transaction(findTransaction(vin.getTxId()));
+            //버그 의심
+            prevTxs.put(Utils.byteArrayToHexString(prevTx.getId()), prevTx);
+        }
+
+        tx.sign(privateKey, prevTxs);
+    }
+
+    public boolean VerifyTransaction(Transaction tx) throws Exception {
+        if(tx.isCoinBase()) return true;
+
+        HashMap<String, Transaction> prevTxs = new HashMap<>();
+
+        for(TxInput vin : tx.getVin()) {
+            Transaction prevTx = findTransaction(vin.getTxId());
+            if(prevTx == null) return false;
+            prevTxs.put(Utils.byteArrayToHexString(prevTx.getId()), prevTx);
+        }
+
+        return tx.Verify(prevTxs);
+
     }
 
     public Iterator<Block> iterator() {

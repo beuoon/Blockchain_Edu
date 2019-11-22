@@ -1,7 +1,7 @@
 import java.math.BigInteger;
 
 public class ProofOfWork {
-    static final int targetBits = 10;
+    static final int targetBits = 5;
     static final BigInteger target = new BigInteger("1").shiftLeft(256-targetBits);
 
     private static byte[] prepareData(Block block, int nonce) {
