@@ -37,7 +37,7 @@ public class Blockchain {
     }
 
 
-    public Block mineBlock(Transaction[] transactions)  {
+    public Block mineBlock(Transaction[] transactions) {
         Bucket bucket = db.getBucket("blocks");
         byte[] lastHash = bucket.get("l");
 

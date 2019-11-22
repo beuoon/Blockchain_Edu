@@ -58,9 +58,8 @@ public class Main {
         addressArr.add(firstNode.getAddress());
         nodes.add(firstNode);
 
-        Scanner scan = new Scanner(System.in);
-        System.out.print("enter key");
-        scan.next();
+        System.out.println("제네시스 블록 만들때까지 대기..");
+        Thread.sleep(100);
 
         for (int i = 1; i < 10; i++) {
             Node node = new Node();
@@ -70,27 +69,23 @@ public class Main {
             nodes.add(node);
         }
 
-        System.out.print("enter key");
-        scan.next();
-
         // Test
         nodes.get(0).send(nodes.get(1).getAddress(), 5);
         nodes.get(0).send(nodes.get(2).getAddress(), 5);
 
-        System.out.print("enter key");
-        scan.next();
+        System.out.println("블록 만들때까지 대기..");
+        Thread.sleep(100);
 
         for (Node node: nodes)
             node.checkBalance();
-
-        System.out.print("enter key");
-        scan.next();
 
         for (Node node: nodes)
             node.close();
 
         for (Node node: nodes)
             node.join();
+
+        System.out.print("끝");
     }
 
 }

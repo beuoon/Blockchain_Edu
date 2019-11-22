@@ -34,6 +34,16 @@ public class TxInput implements Serializable {
         this.signature = signature;
     }
 
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof TxInput) {
+            TxInput txInput = (TxInput)o;
+            return (Arrays.equals(txId, txInput.txId) && vOut == txInput.vOut);
+        }
+        return false;
+    }
+
     public byte[] getTxId() {
         return txId;
     }

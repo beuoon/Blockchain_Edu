@@ -3,10 +3,10 @@ package node;
 import DB.Db;
 import blockchain.*;
 import blockchain.transaction.Transaction;
+import blockchain.transaction.TxInput;
 import blockchain.transaction.TxOutput;
 import blockchain.transaction.UTXOSet;
 import blockchain.wallet.Wallet;
-import blockchain.wallet.Wallets;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;
 import org.bitcoinj.core.Base58;
@@ -33,7 +33,6 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
     private HashMap<String, Transaction> mempool = new HashMap<>();
 
     // Network
-    private static final int COMMAND_LEN = 13, DATA_TYPE_LEN = 5;
     private Network network;
 
     // Mutex
@@ -119,13 +118,45 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
             mempoolSem.acquire();
             try {
                 if (mempool.size() >= 2) {
-                    int txLen = mempool.size();
-                    txs = new Transaction[txLen + 1];
+                    ArrayList<Transaction> txList = new ArrayList<>();
                     Iterator<Transaction> iter = mempool.values().iterator();
 
-                    for (int i = 0; i < txLen && iter.hasNext(); i++)
-                        txs[i] = iter.next();
-                    txs[txLen] = new Transaction(address, "");
+                    ArrayList<TxInput> usedVin = new ArrayList<>();
+
+                    while (iter.hasNext()) {
+                        Transaction tx = iter.next();
+                        String key = Base58.encode(tx.getId());
+
+                        // tx 검증
+                        if (!bc.VerifyTransaction(tx)) {
+                            mempool.remove(key);
+                            continue;
+                        }
+
+                        //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
+                        // vin 확인
+                        boolean canUse = true;
+                        for (TxInput vin : tx.getVin()) {
+                            if (usedVin.contains(vin)) {
+                                canUse = false;
+                                break;
+                            }
+                        }
+                        if (!canUse) { // 이미 사용한 vin
+                            mempool.remove(key);
+                            continue;
+                        }
+
+                        usedVin.addAll(tx.getVin());
+
+                        //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
+                        txList.add(tx);
+                    }
+
+                    if (txList.size() >= 1) {
+                        txList.add(new Transaction(address, ""));
+                        txs = txList.toArray(new Transaction[]{});
+                    }
                 }
             } catch (Exception ignored) {
             } finally {
@@ -145,9 +176,11 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         if (newBlock == null) return ; // 채굴 실패
 
-        // UTXO reindex
+        // UTXO update
         UTXOSet utxoSet = new UTXOSet(bc);
         utxoSet.update(newBlock);
+
+        System.out.println(number + "번 노드가 블록을 채굴!!");
 
         // 블록내 트랜잭션 pool 에서 제거
         try {
@@ -163,7 +196,7 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // 블록 전파
         for (Client client : network.getClients())
-            sendInv(client, InvType.Tx, new byte[][]{newBlock.getHash()});
+            sendInv(client, InvType.Block, new byte[][]{newBlock.getHash()});
     }
 
     public void eventReceived(Object sender, MessageEventArgs e) {
@@ -193,11 +226,10 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         // Data
         int dataLen = 0;
-        for (int i = 0; i < items.length; i++)
-            dataLen += items[i].length;
+        for (byte[] item : items) dataLen += item.length;
 
         byte[] data = new byte[dataLen];
-        for (int i = 0, j = 0; i < items.length; i++, j += items[i].length)
+        for (int i = 0, j = 0; i < items.length; j += items[i++].length)
             System.arraycopy(items[i], 0, data, j, items[i].length);
 
         // Buff
