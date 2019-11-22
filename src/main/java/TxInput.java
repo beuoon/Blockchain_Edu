@@ -5,21 +5,13 @@ import java.util.Arrays;
 
 public class TxInput implements Serializable {
 
-    public String getTxId() {
-        return txId;
-    }
-
-    public int getvOut() {
-        return vOut;
-    }
-
-    private String txId;
+    private byte[] txId;
     private int vOut;
-    private byte[] pubKey;
+    private PublicKey pubKey;
     private byte[] signature;
 
 
-    public TxInput(String txId, int vOut, byte[] pubKey, byte[] signature) {
+    public TxInput(byte[] txId, int vOut, PublicKey pubKey, byte[] signature) {
         this.txId = txId;
         this.vOut = vOut;
         this.pubKey = pubKey;
@@ -27,15 +19,29 @@ public class TxInput implements Serializable {
     }
 
     public boolean usesKey(byte[] pubKeyHash) {
-        byte[] lockingHash = Utils.ripemd160(Utils.sha256(pubKey));
+        byte[] lockingHash = Utils.ripemd160(Utils.sha256(pubKey.getEncoded()));
         return Arrays.equals(lockingHash, pubKeyHash);
     }
 
-    public void setPubKey(byte[] pubKey) {
+    public void setPubKey(PublicKey pubKey) {
         this.pubKey = pubKey;
     }
 
     public void setSignature(byte[] signature) {
         this.signature = signature;
+    }
+
+    public byte[] getTxId() {
+        return txId;
+    }
+
+    public int getvOut() {
+        return vOut;
+    }
+    public byte[] getSignature() {
+        return signature;
+    }
+    public PublicKey getPubKey() {
+        return pubKey;
     }
 }
