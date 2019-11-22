@@ -1,4 +1,4 @@
-package blockchain;
+package blockchain.wallet;
 
 import org.bitcoinj.core.Base58;
 import utils.Utils;

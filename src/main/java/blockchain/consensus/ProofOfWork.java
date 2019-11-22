@@ -1,5 +1,6 @@
-package blockchain;
+package blockchain.consensus;
 
+import blockchain.Block;
 import utils.Utils;
 
 import java.math.BigInteger;

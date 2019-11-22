@@ -1,4 +1,4 @@
-package blockchain;
+package utils;
 
 public class Pair<T, K> {
     private T k;

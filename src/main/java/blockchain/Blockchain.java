@@ -1,5 +1,10 @@
 package blockchain;
 
+import DB.Bucket;
+import DB.Db;
+import blockchain.transaction.*;
+import blockchain.wallet.Wallet;
+import utils.Pair;
 import utils.Utils;
 
 import java.security.*;
@@ -7,8 +12,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 
 public class Blockchain {
-
-    private Db db;
+        private Db db;
     byte[] tip;
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
 
@@ -21,6 +25,9 @@ public class Blockchain {
 
         this.db = db;
         this.tip = genesisBlock.getHash();
+
+        UTXOSet utxoSet = new UTXOSet(this);
+        utxoSet.reIndex();
     }
 
     public Blockchain(Db db) {
@@ -37,30 +44,15 @@ public class Blockchain {
             }
         }
 
-        Db.Bucket bucket = db.getBucket("blocks");
+        Bucket bucket = db.getBucket("blocks");
         byte[] lastHash = bucket.get("l");
         Block newBlock = new Block(transactions, lastHash);
         bucket.put(new String(newBlock.getHash()) ,newBlock.toBytes());
 
         bucket.put("l", newBlock.getHash());
-        tip = newBlock.getHash();
+        this.tip = newBlock.getHash();
 
         return newBlock;
-    }
-
-    public ArrayList<TxOutput> findUTXO(byte[] pubkeyHash) {
-        ArrayList<TxOutput> UTXOs = new ArrayList();
-        ArrayList<Transaction> unspentTransactions = findUnspentTransactions(pubkeyHash);
-
-        for(Transaction tx : unspentTransactions) {
-            for( TxOutput out : tx.getVout()) {
-                if(out.isLockedWithKey(pubkeyHash)) {
-                    UTXOs.add(out);
-                }
-            }
-        }
-
-        return UTXOs;
     }
 
     public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
@@ -71,7 +63,7 @@ public class Blockchain {
         while(itr.hasNext()){
             Block block = itr.next();
             for( Transaction tx : block.getTransactions()) {
-                String txId = Utils.byteArrayToHexString(tx.id);
+                String txId = Utils.byteArrayToHexString(tx.getId());
 
                 OutPuts:
                 for(int i=0; i<tx.getVout().size(); i++) {
@@ -109,38 +101,57 @@ public class Blockchain {
         return unspentTxs;
     }
 
-    public Pair<Integer, HashMap<String, ArrayList<Integer>>> findSpendableOutputs(byte[] pubkeyHash, int amount) {
-        HashMap<String, ArrayList<Integer>> unspentOutputs = new HashMap();
-        ArrayList<Transaction> unspentTxs = findUnspentTransactions(pubkeyHash);
-        int accumulated = 0;
+    public HashMap<String, TxOutputs> findUTXO() {
+        HashMap<String, TxOutputs> UTXO = new HashMap<>();
+        HashMap<String, ArrayList<Integer>> spentTXOs = new HashMap<>();
 
-        Work:
-        for(Transaction tx : unspentTxs) {
-            String txId = Utils.byteArrayToHexString(tx.getId());
+        Iterator<Block> itr = iterator();
+        while(itr.hasNext()){
+            Block block = itr.next();
 
-            for(int i=0; i<tx.getVout().size(); i++) {
-                TxOutput out = tx.getVout().get(i);
-                if(out.isLockedWithKey(pubkeyHash) && accumulated < amount) {
-                    accumulated += out.getValue();
-                    if(unspentOutputs.get(txId) == null) unspentOutputs.put(txId, new ArrayList<Integer>());
-                    unspentOutputs.get(txId).add(i);
+            for(Transaction tx : block.getTransactions()) {
+                String txId = Utils.byteArrayToHexString(tx.getId());
+
+                Outputs:
+                for(int outIdx = 0; outIdx < tx.getVout().size(); outIdx++){
+                    TxOutput out = tx.getVout().get(outIdx);
+
+                    if(spentTXOs.get(txId) != null) {
+                        for(Integer spentOutIdx : spentTXOs.get(txId)) {
+                            if(spentOutIdx == outIdx) {
+                                continue Outputs;
+                            }
+                        }
+                    }
+
+                    TxOutputs outs = UTXO.get(txId);
+                    if(outs == null) {
+                        outs = new TxOutputs();
+                        UTXO.put(txId, outs);
+                    }
+                    outs.getOutputs().add(out);
+                    UTXO.put(txId, outs);
                 }
 
-                if( accumulated >= amount ){
-                    break Work;
+                if(tx.isCoinBase() == false) {
+                    for(TxInput in : tx.getVin()) {
+                        String inTxId = Utils.byteArrayToHexString(in.getTxId());
+                        spentTXOs.get(inTxId).add(in.getvOut());
+                    }
                 }
             }
-        }
 
-        return new Pair(accumulated, unspentOutputs);
+            if(block.getPrevBlockHash().length == 0) break;
+        }
+        return UTXO;
     }
 
-    public Transaction newUTXOTransaction(Wallet wallet, String to, int amount) throws Exception{
+    public Transaction newUTXOTransaction(Wallet wallet, String to, int amount, UTXOSet utxoSet) throws Exception{
         ArrayList<TxInput> inputs = new ArrayList();
         ArrayList<TxOutput> outputs = new ArrayList();
 
         byte[] pubkeyHash = Utils.ripemd160(Utils.sha256(wallet.getPublicKey().getEncoded()));
-        Pair<Integer, HashMap<String, ArrayList<Integer>>> spendableOutputs = findSpendableOutputs(pubkeyHash, amount);
+        Pair<Integer, HashMap<String, ArrayList<Integer>>> spendableOutputs = utxoSet.findSpendableOutputs(pubkeyHash, amount);
         int acc = spendableOutputs.getKey();
         HashMap<String, ArrayList<Integer>> validOutputs = spendableOutputs.getValue();
 
@@ -166,7 +177,7 @@ public class Blockchain {
 
         Transaction tx = new Transaction(new byte[]{}, inputs, outputs);
         tx.setId(tx.Hash());
-        signTransaction(tx, wallet.getPrivateKey());
+        utxoSet.getBc().signTransaction(tx, wallet.getPrivateKey());
         return tx;
     }
 
@@ -188,7 +199,6 @@ public class Blockchain {
 
         for(TxInput vin : tx.getVin()) {
             Transaction prevTx = new Transaction(findTransaction(vin.getTxId()));
-            //버그 의심
             prevTxs.put(Utils.byteArrayToHexString(prevTx.getId()), prevTx);
         }
 
@@ -208,6 +218,10 @@ public class Blockchain {
 
         return tx.Verify(prevTxs);
 
+    }
+
+    public Db getDb() {
+        return db;
     }
 
     public Iterator<Block> iterator() {

@@ -1,4 +1,4 @@
-package blockchain;
+package blockchain.transaction;
 
 import org.bitcoinj.core.Base58;
 

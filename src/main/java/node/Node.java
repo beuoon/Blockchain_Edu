@@ -1,6 +1,9 @@
 package node;
 
+import DB.Db;
 import blockchain.*;
+import blockchain.transaction.Transaction;
+import blockchain.wallet.Wallets;
 import node.event.EventHandler;
 import node.event.MessageEventArgs;
 import org.bitcoinj.core.Base58;

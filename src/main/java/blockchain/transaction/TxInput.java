@@ -1,10 +1,9 @@
-package blockchain;
+package blockchain.transaction;
 
 import utils.Utils;
 
 import java.io.Serializable;
 import java.security.PublicKey;
-import java.security.Signature;
 import java.util.Arrays;
 
 public class TxInput implements Serializable {

@@ -1,4 +1,4 @@
-package blockchain;
+package blockchain.wallet;
 
 import java.util.ArrayList;
 import java.util.HashMap;

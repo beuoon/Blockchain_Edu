@@ -1,6 +1,5 @@
 package utils;
 
-import blockchain.Transaction;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
 import java.io.*;
