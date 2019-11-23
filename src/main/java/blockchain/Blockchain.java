@@ -5,6 +5,7 @@ import DB.Db;
 import blockchain.consensus.ProofOfWork;
 import blockchain.transaction.*;
 import blockchain.wallet.Wallet;
+import node.Mempool;
 import utils.Pair;
 import utils.Utils;
 
@@ -12,22 +13,36 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 
+import static blockchain.consensus.ProofOfWork.powStopFlag;
+
 public class Blockchain {
     private Db db;
-    byte[] tip;
+   public byte[] tip;
     int lastHeight;
+
+    Mempool<String, Block> mempool = new Mempool<>();
 
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
 
     public Blockchain(String address, Db db) {
         Transaction coinbaseTx = new Transaction(address, genesisCoinbaseData);
         Block genesisBlock = new Block(coinbaseTx); // create genesis block
+        Bucket b = db.getBucket("blocks");
+        ProofOfWork.mine(genesisBlock);
 
-        db.getBucket("blocks").put(Utils.byteArrayToHexString(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchain
-        db.getBucket("blocks").put("l", genesisBlock.getHash());
+        b.put(Utils.byteArrayToHexString(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchain
+        b.put("l", genesisBlock.getHash());
 
         this.db = db;
         this.tip = genesisBlock.getHash();
+        this.lastHeight = -1;
+        ArrayList<byte[]> blockList = new ArrayList<>();
+
+        if(b.get("h" + genesisBlock.getHeight()) != null)
+            blockList = Utils.toObject(b.get("h" + genesisBlock.getHeight()));
+        blockList.add(genesisBlock.getHash());
+
+        b.put("h" + genesisBlock.getHeight(), Utils.toBytes(blockList));
 
         UTXOSet utxoSet = new UTXOSet(this);
         utxoSet.reIndex();
@@ -36,6 +51,7 @@ public class Blockchain {
     public Blockchain(Db db) {
         this.db = db;
         this.tip = null;
+        this.lastHeight = -1;
     }
 
     public Block mineBlock(Transaction[] transactions) {
@@ -54,14 +70,17 @@ public class Blockchain {
         bucket.put("h" + newBlock.getHeight(), Utils.toBytes(blockList));
 
         this.tip = newBlock.getHash();
+        this.lastHeight = newBlock.getHeight();
+
+
+        UTXOSet utxoSet = new UTXOSet(this);
+        utxoSet.update(newBlock);
 
         return newBlock;
     }
 
     public boolean addBlock(Block block) {
         Bucket bucket = db.getBucket("blocks");
-
-
        //블록이 PoW를 만족하는가?
         ProofOfWork.validate(block);
 
@@ -75,6 +94,10 @@ public class Blockchain {
 
         //지금 온 블록이 최신 블록 보다 작거나 같으면?
         if(block.getHeight() <= lastHeight) {
+            if(bucket.get("h"+ (block.getHeight()-1)) == null) {
+                System.out.println((block.getHeight()-1) +" "+ lastHeight );
+            }
+
             ArrayList<byte[]> hashList = Utils.toObject(bucket.get("h"+ (block.getHeight()-1)));
             for(byte[] hash : hashList) {
                 Block b = Utils.toObject(bucket.get(Utils.byteArrayToHexString(hash)));
@@ -87,26 +110,32 @@ public class Blockchain {
 
                     bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
                     bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
-                    return true;
+                    return false;
                 }
             }
             return false;
         }
 
-
-        boolean flag = false;
-        //이 블록이 내 최신높이에 있는 블록의 다음블록이 맞느냐?
-        ArrayList<byte[]> lasthashList = Utils.toObject(bucket.get("h"+ (block.getHeight()-1)));
-        for(byte[] lasthash : lasthashList) {
-            Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lasthash)));
-            if (Arrays.equals(block.getPrevBlockHash(), lastBlock.getHash())) {
-                flag = true;
-            }
+        if(block.getHeight() > lastHeight+1) {
+            mempool.put(Utils.byteArrayToHexString(block.getHash()), block);
+            return false;
         }
-        if(!flag) return false;
 
-        //PoW 중지.
-        ProofOfWork.powStopFlag = true;
+        //이 블록이 내 최신높이에 있는 블록의 다음블록이 맞느냐?
+        if(block.getHeight() != 0) {
+            boolean flag = false;
+            ArrayList<byte[]> lasthashList = Utils.toObject(bucket.get("h" + (block.getHeight() - 1)));
+            for (byte[] lasthash : lasthashList) {
+                Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lasthash)));
+                if (Arrays.equals(block.getPrevBlockHash(), lastBlock.getHash())) {
+                    flag = true;
+                }
+            }
+            if (!flag) return false;
+            //PoW 중지.
+            powStopFlag = true;
+        }
+
 
         bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
         bucket.put("l", block.getHash());
@@ -118,7 +147,19 @@ public class Blockchain {
 
         bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
         tip = block.getHash();
+        lastHeight = block.getHeight();
 
+        Iterator<Block> itr = mempool.values().iterator();
+        while(itr.hasNext()){
+            Block b = itr.next();
+            if(b.getHeight() == lastHeight+1) {
+                addBlock(b);
+                break;
+            }
+        }
+
+        UTXOSet utxoSet = new UTXOSet(this);
+        utxoSet.update(block);
 
         return true;
     }
@@ -307,6 +348,7 @@ public class Blockchain {
     public Db getDb() {
         return db;
     }
+
     public boolean validate() {
         return tip != null;
     }

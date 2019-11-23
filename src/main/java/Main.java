@@ -1,15 +1,10 @@
-import DB.Db;
-import blockchain.Blockchain;
+import blockchain.transaction.Transaction;
 import blockchain.wallet.Wallets;
-import blockchain.Functions;
-import node.Node;
-import org.bitcoinj.core.Base58;
+import node.network.Network;
+import node.network.Node;
 import utils.Utils;
 
-import java.security.PublicKey;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Scanner;
 
 public class Main {
     public static void main(String args[]) throws Exception {
@@ -49,14 +44,35 @@ public class Main {
         Functions.getBalance(address3, bc);
 
          */
+
         Wallets wallets = new Wallets();
         ArrayList<Node> nodes = new ArrayList<>();
 
         Node firstNode = new Node();
         firstNode.createWallet();
         firstNode.createGenesisBlock(firstNode.getWallet().getAddress());
-        firstNode.start();
         nodes.add(firstNode);
+
+/*
+
+        Node SecondNode = new Node();
+        SecondNode.createWallet();
+        SecondNode.start();
+
+        Node ThirdNode = new Node();
+        ThirdNode.createWallet();
+        ThirdNode.start();
+
+        firstNode.getNetwork().autoConnect(2);
+        firstNode.getNetwork().broadcast(Network.TYPE.TX, new Transaction(firstNode.getWallet().getAddress(), "Test'"));
+
+        System.out.println("=------------------------");
+
+        SecondNode.getNetwork().autoConnect(2);
+        SecondNode.getNetwork().broadcast(Network.TYPE.TX, new Transaction(firstNode.getWallet().getAddress(), "Test'"));
+*/
+
+
 
         System.out.println("제네시스 블록 만들때까지 대기..");
         Thread.sleep(1000);
@@ -65,8 +81,16 @@ public class Main {
             Node node = new Node();
             node.createWallet();
             node.createNullBlockchain();
-            node.start();
+            node.setGenesisBlock(firstNode.getGenesisBlock());
             nodes.add(node);
+        }
+
+        for(Node node : nodes){
+            node.getNetwork().autoConnect(3);
+        }
+
+        for(Node node : nodes){
+            node.start();
         }
 
         // Test
@@ -87,11 +111,6 @@ public class Main {
         for (Node node: nodes)
             node.checkBalance();
 
-        for (Node node: nodes)
-            node.close();
-
-        for (Node node: nodes)
-            node.join();
 
         System.out.print("끝");
     }
