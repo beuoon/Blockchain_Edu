@@ -1,7 +1,9 @@
 package node;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 
 public class Mempool<K, V>  {
@@ -34,7 +36,7 @@ public class Mempool<K, V>  {
         V value = null;
         try {
             semaphore.acquire();
-            mempool.get(key);
+            value = mempool.get(key);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
@@ -77,7 +79,8 @@ public class Mempool<K, V>  {
         Collection<V> values = null;
         try {
             semaphore.acquire();
-            values = mempool.values();
+            HashMap<K, V> copy = (HashMap<K,V>)mempool.clone();
+            values = copy.values();
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {

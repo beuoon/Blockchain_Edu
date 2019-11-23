@@ -4,14 +4,12 @@ import blockchain.Block;
 import blockchain.Blockchain;
 import blockchain.transaction.Transaction;
 import node.event.EventHandler;
+import node.event.EventListener;
 import utils.Utils;
 
 import java.lang.Thread.State;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Random;
+import java.util.*;
 
 
 public class Network {
@@ -20,134 +18,112 @@ public class Network {
         int NONE = 1, BLOCK = 2, INV = 3, GETBLOCK = 4, GETDATA = 5 , TX = 6, VERSION = 7;
     }
 
-    private static final int BASE_PORT = 10000;
     private static final int MIN_CONNECT_NUM = 2;
     private static final int MAX_CONNECT_NUM = 5;
+    private static ArrayList<Node> nodes = new ArrayList();
+    Node self;
 
-    private Server server;
-    private ArrayList<Client> clients = new ArrayList();
-    private EventHandler handler;
+    private ArrayList<Node> connList = new ArrayList<>();
 
-    public Network(int nodeId, EventHandler handler) throws Exception {
-        Random rand = new Random();
-        int connNum = rand.nextInt(MAX_CONNECT_NUM-MIN_CONNECT_NUM) + MIN_CONNECT_NUM;
-        if (connNum > nodeId) connNum = nodeId;
-
-        HashSet<Integer> bUsePort = new HashSet<>();
-
-        this.handler = handler;
-
-        while(connNum > 0) {
-            int port = BASE_PORT + rand.nextInt(nodeId);
-            if (bUsePort.contains(port)) continue;
-            bUsePort.add(port);
-
-            try {
-                Socket socket = new Socket("localhost", port);
-                Client client = new Client(socket, port, handler);
-                client.start();
-                clients.add(client);
-            } catch (Exception ignored) {}
-
-            --connNum;
-        }
-
-        server = new Server(BASE_PORT + nodeId, clients, handler);
-        server.start();
+    public Network(Node node) {
+        nodes.add(node);
+        self = node;
     }
 
-    public ArrayList<Client> getClients() { return clients; }
-
-    public void broadcast(Object o) {
-        String className = o.getClass().getSimpleName();
-        switch(className) {
-            case "Transaction" :
-                for (Client client : clients)
-                    sendTx(client, (Transaction)o);
-                break;
+    public ArrayList<String> getConnList() {
+        ArrayList<String> list = new ArrayList<>();
+        for(Node node : connList) {
+            list.add(node.getNodeId());
         }
 
+        return list;
     }
 
-    public boolean checkConnection() {
-        if (server.getState() == State.TERMINATED)
-            return false;
+    public void autoConnect(int num) {
+        if(connList.size() >= num) return;
+        num -= connList.size();
 
-        for (int i = 0; i < clients.size(); ) {
-            if (clients.get(i).getState() == State.TERMINATED)
-                clients.remove(i);
-            else
-                ++i;
-        }
+        while(num > 0) {
+            Random rand = new Random();
+            int idx = Math.abs(rand.nextInt()) % nodes.size();
+            Node node = nodes.get(idx);
 
-        return true;
-    }
+            if(connList.contains(node)) continue;
 
-    public void close() {
-        try {
-            server.close();
-            server.join();
-        } catch (InterruptedException ignored) {}
-
-        for (int i = 0; i < clients.size(); i++) {
-            Client client = clients.get(i);
-            try {
-                client.close();
-                client.join();
-            } catch (InterruptedException ignored) {}
+            connList.add(node);
+            num--;
         }
     }
 
+    public void connectTo(String nodeId, String myNodeId){
+        for(Node node : nodes) {
+            if(node.getNodeId().equals(nodeId)) {
+                if(connList.contains(node)) return;
+                connList.add(node);
+                if(myNodeId == null) return;
+                node.getNetwork().connectTo(myNodeId, null);
+                return;
+            }
+        }
+    }
+    
     public void requestBlocks() {
     }
 
-    public void sendBlock(Client client, Block block) {
+    public void sendBlock(String nodeId, Block block) {
         byte[] command = new byte[]{TYPE.BLOCK};
         byte[] data = Utils.toBytes(block);
 
         byte[] buff = Utils.bytesConcat(command, data);
 
-        client.send(buff);
+        send(nodeId, buff);
     }
 
-    public void sendInv(Client client, int invType, byte[] data) {
+    public void sendInv(String nodeId, int invType, byte[] data) {
         byte[] command = new byte[]{TYPE.INV};
         byte[] binvType = new byte[]{(byte)invType};
 
         byte[] buff = Utils.bytesConcat(command, binvType, data);
 
-        client.send(buff);
+        send(nodeId, buff);
     }
 
-    public void sendGetBlocks(Client client) {
-        byte[] command = new byte[]{TYPE.GETBLOCK};
-        client.send(command);
+    public void sendGetBlocks(String nodeId) {
+        byte[] buff = new byte[]{TYPE.GETBLOCK};
+        send(nodeId, buff);
     }
 
-    public void sendGetData(Client client, int invType, byte[] data) {
+    public void sendGetData(String nodeId, int invType, byte[] data) {
         byte[] command = new byte[]{TYPE.GETDATA};
         byte[] it = new byte[]{(byte)invType};
 
-        byte[] buffer = Utils.bytesConcat(command, it, data);
+        byte[] buff = Utils.bytesConcat(command, it, data);
 
-        client.send(buffer);
+        send(nodeId, buff);
     }
 
-    public void sendTx(Client client, Transaction tx) {
+    public void sendTx(String nodeId, Transaction tx) {
         byte[] command = new byte[]{TYPE.TX};
         byte[] data = Utils.toBytes(tx);
 
         byte[] buff = Utils.bytesConcat(command, data);
 
-        client.send(buff);
+        send(nodeId, buff);
     }
 
-    public void sendVersion(Client client, Blockchain bc) {
+    public void sendVersion(String nodeId) {
         byte[] command = new byte[]{TYPE.VERSION};
         byte[] data = null; // TODO: bc.getBestHeight();
         byte[] buff = Utils.bytesConcat(command, data);
-        client.send(buff);
+        send(nodeId, buff);
     }
+
+    private void send(String nodeId, byte[] buff) {
+        EventHandler.callEvent(Network.class, self.getNodeId(), nodeId, buff);
+    }
+
+
+
 
 
 }

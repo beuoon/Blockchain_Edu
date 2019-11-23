@@ -61,7 +61,7 @@ public class UTXOSet {
             if(!tx.isCoinBase()) {
                 for(TxInput vin : tx.getVin()) {
                     TxOutputs updatedOuts = new TxOutputs();
-                    TxOutputs outs = (TxOutputs)Utils.toObject(b.get(Utils.byteArrayToHexString(vin.getTxId())));
+                    TxOutputs outs = Utils.toObject(b.get(Utils.byteArrayToHexString(vin.getTxId())));
 
                     for(int outIdx = 0; outIdx < outs.getOutputs().size(); outIdx++) {
                         TxOutput out = outs.getOutputs().get(outIdx);
