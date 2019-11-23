@@ -121,9 +121,4 @@ public class Network {
     private void send(String nodeId, byte[] buff) {
         EventHandler.callEvent(Network.class, self.getNodeId(), nodeId, buff);
     }
-
-
-
-
-
 }

@@ -1,4 +1,4 @@
-package node;
+package node.network;
 
 import DB.Bucket;
 import DB.Db;
@@ -192,11 +192,14 @@ public class Node extends Thread implements EventListener {
 
         if (txs == null) return; // 채굴 안함
 
-        Block newBlock = bc.mineBlock(txs); // TODO: 채굴 도중 다른 블록 들어오는 거 예외처리 해야 됨
-        if (newBlock == null) return; // 채굴 실패
 
-
-        System.out.println(nodeId + "번 노드가 블록을 채굴!!");
+        System.out.println(nodeId + "번 노드 채굴 시작");
+        Block newBlock = bc.mineBlock(txs);
+        if (newBlock == null) {
+            System.out.println(nodeId + "번 노드 채굴 실패");
+            return; // 채굴 실패
+        }
+        System.out.println(nodeId + "번 노드 블록 채굴 성공!!");
 
         // 블록내 트랜잭션 pool 에서 제거
 
@@ -227,11 +230,12 @@ public class Node extends Thread implements EventListener {
             utxoSet.reIndex();
         }
         else {
-            System.out.println("node"+getNodeId()+ "normal");
+            // System.out.println("node"+getNodeId()+ "normal");
+            System.out.println(nodeId + "에 블록이 추가 되려고합니다.");
             if (!bc.addBlock(block))
                 return;
+            System.out.println(nodeId + "에 블록이 추가 되었습니다.");
         }
-
 
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())
@@ -313,7 +317,7 @@ public class Node extends Thread implements EventListener {
 
         if (!mempool.containsKey(id)) {
             mempool.put(id, tx);
-            System.out.println("Tx "+ nodeId + ": " + id);
+            // System.out.println("Tx "+ nodeId + ": " + id);
 
             // 전파
             for (String _nodeId : network.getConnList()){

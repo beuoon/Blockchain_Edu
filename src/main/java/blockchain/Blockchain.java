@@ -13,13 +13,12 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 
-import static blockchain.consensus.ProofOfWork.powStopFlag;
-
 public class Blockchain {
     private Db db;
    public byte[] tip;
     int lastHeight;
 
+    private ProofOfWork pow = new ProofOfWork();
     Mempool<String, Block> mempool = new Mempool<>();
 
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
@@ -28,7 +27,7 @@ public class Blockchain {
         Transaction coinbaseTx = new Transaction(address, genesisCoinbaseData);
         Block genesisBlock = new Block(coinbaseTx); // create genesis block
         Bucket b = db.getBucket("blocks");
-        ProofOfWork.mine(genesisBlock);
+        pow.mine(genesisBlock);
 
         b.put(Utils.byteArrayToHexString(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchain
         b.put("l", genesisBlock.getHash());
@@ -60,7 +59,7 @@ public class Blockchain {
         Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lastHash)));
 
         Block newBlock = new Block(transactions, lastHash, lastBlock.getHeight()+1);
-        if(!ProofOfWork.mine(newBlock)) return null;
+        if(!pow.mine(newBlock)) return null;
 
         bucket.put(Utils.byteArrayToHexString(newBlock.getHash()), Utils.toBytes(newBlock));
         bucket.put("l", newBlock.getHash());
@@ -82,7 +81,7 @@ public class Blockchain {
     public boolean addBlock(Block block) {
         Bucket bucket = db.getBucket("blocks");
        //블록이 PoW를 만족하는가?
-        ProofOfWork.validate(block);
+        ProofOfWork.Validate(block);
 
         // 트랜잭션 검증
         for (Transaction tx : block.getTransactions()) {
@@ -132,10 +131,7 @@ public class Blockchain {
                 }
             }
             if (!flag) return false;
-            //PoW 중지.
-            powStopFlag = true;
         }
-
 
         bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
         bucket.put("l", block.getHash());
@@ -148,6 +144,7 @@ public class Blockchain {
         bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
         tip = block.getHash();
         lastHeight = block.getHeight();
+        pow.renewLastHeight(lastHeight);
 
         Iterator<Block> itr = mempool.values().iterator();
         while(itr.hasNext()){

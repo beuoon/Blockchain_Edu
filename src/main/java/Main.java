@@ -53,27 +53,6 @@ public class Main {
         firstNode.createGenesisBlock(firstNode.getWallet().getAddress());
         nodes.add(firstNode);
 
-/*
-
-        Node SecondNode = new Node();
-        SecondNode.createWallet();
-        SecondNode.start();
-
-        Node ThirdNode = new Node();
-        ThirdNode.createWallet();
-        ThirdNode.start();
-
-        firstNode.getNetwork().autoConnect(2);
-        firstNode.getNetwork().broadcast(Network.TYPE.TX, new Transaction(firstNode.getWallet().getAddress(), "Test'"));
-
-        System.out.println("=------------------------");
-
-        SecondNode.getNetwork().autoConnect(2);
-        SecondNode.getNetwork().broadcast(Network.TYPE.TX, new Transaction(firstNode.getWallet().getAddress(), "Test'"));
-*/
-
-
-
         System.out.println("제네시스 블록 만들때까지 대기..");
         Thread.sleep(1000);
 
