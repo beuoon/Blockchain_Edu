@@ -77,15 +77,17 @@ public class Blockchain {
             ProofOfWork.Validate(block);
 
             // 트랜잭션 검증
+            /*
             for (Transaction tx : block.getTransactions()) {
                 if (!verifyTransaction(tx)) return false;
 
-                if (tx.isCoinBase()) continue;
-
+                /* // 체인을 다를 경우 제외
                 UTXOSet utxoSet = new UTXOSet(this);
                 for (TxInput vin : tx.getVin())
                     if (!utxoSet.validVin(vin)) return false;
+
             }
+                 */
 
 
             // 블록 검증 및 포크
@@ -141,11 +143,16 @@ public class Blockchain {
             blockList.add(block.getHash());
 
             bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
+            byte[] prevTip = tip;
             tip = block.getHash();
             lastHeight = block.getHeight();
             pow.renewLastHeight(lastHeight);
 
-            if (block.getHeight() > 0) {
+            if (!Arrays.equals(prevTip, block.getPrevBlockHash())) {
+                UTXOSet utxoSet = new UTXOSet(this);
+                utxoSet.reIndex();
+            }
+            else if (block.getHeight() > 0) {
                 UTXOSet utxoSet = new UTXOSet(this);
                 utxoSet.update(block);
             }
@@ -220,30 +227,24 @@ public class Blockchain {
             for(Transaction tx : block.getTransactions()) {
                 String txId = Utils.byteArrayToHexString(tx.getId());
 
-                Outputs:
+                TxOutputs outs = new TxOutputs();
                 for(int outIdx = 0; outIdx < tx.getVout().size(); outIdx++){
                     TxOutput out = tx.getVout().get(outIdx);
 
-                    if(spentTXOs.get(txId) != null) {
-                        for(Integer spentOutIdx : spentTXOs.get(txId)) {
-                            if(spentOutIdx == outIdx) {
-                                continue Outputs;
-                            }
-                        }
-                    }
+                    if(spentTXOs.containsKey(txId) && spentTXOs.get(txId).contains(outIdx))
+                        continue;
 
-                    TxOutputs outs = UTXO.get(txId);
-                    if(outs == null) {
-                        outs = new TxOutputs();
-                        UTXO.put(txId, outs);
-                    }
                     outs.getOutputs().put(outIdx, out);
-                    UTXO.put(txId, outs);
                 }
+                if (outs.getOutputs().size() > 0)
+                    UTXO.put(txId, outs);
 
-                if(tx.isCoinBase() == false) {
+                if(!tx.isCoinBase()) {
                     for(TxInput in : tx.getVin()) {
                         String inTxId = Utils.byteArrayToHexString(in.getTxId());
+
+                        if (!spentTXOs.containsKey(inTxId))
+                            spentTXOs.put(inTxId, new ArrayList<>());
                         spentTXOs.get(inTxId).add(in.getvOut());
                     }
                 }
