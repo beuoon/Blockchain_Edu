@@ -12,6 +12,7 @@ import utils.Utils;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 
 public class Blockchain {
     private Db db;
@@ -20,6 +21,7 @@ public class Blockchain {
 
     private ProofOfWork pow = new ProofOfWork();
     Mempool<String, Block> mempool = new Mempool<>();
+    private Semaphore semaphore = new Semaphore(1);
 
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
 
@@ -61,19 +63,7 @@ public class Blockchain {
         Block newBlock = new Block(transactions, lastHash, lastBlock.getHeight()+1);
         if(!pow.mine(newBlock)) return null;
 
-        bucket.put(Utils.byteArrayToHexString(newBlock.getHash()), Utils.toBytes(newBlock));
-        bucket.put("l", newBlock.getHash());
-
-        ArrayList<byte[]> blockList = new ArrayList<>();
-        blockList.add(newBlock.getHash());
-        bucket.put("h" + newBlock.getHeight(), Utils.toBytes(blockList));
-
-        this.tip = newBlock.getHash();
-        this.lastHeight = newBlock.getHeight();
-
-
-        UTXOSet utxoSet = new UTXOSet(this);
-        utxoSet.update(newBlock);
+        secureAddBlock(newBlock);
 
         return newBlock;
     }
@@ -133,18 +123,7 @@ public class Blockchain {
             if (!flag) return false;
         }
 
-        bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
-        bucket.put("l", block.getHash());
-
-        ArrayList<byte[]> blockList = new ArrayList<>();
-        if(bucket.get("h" + block.getHeight()) != null)
-            blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
-        blockList.add(block.getHash());
-
-        bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
-        tip = block.getHash();
-        lastHeight = block.getHeight();
-        pow.renewLastHeight(lastHeight);
+        secureAddBlock(block);
 
         Iterator<Block> itr = mempool.values().iterator();
         while(itr.hasNext()){
@@ -155,10 +134,36 @@ public class Blockchain {
             }
         }
 
-        UTXOSet utxoSet = new UTXOSet(this);
-        utxoSet.update(block);
-
         return true;
+    }
+
+    private void secureAddBlock(Block block) {
+        Bucket bucket = db.getBucket("blocks");
+
+        try {
+            semaphore.acquire();
+
+            try {
+                bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+                bucket.put("l", block.getHash());
+
+                ArrayList<byte[]> blockList = new ArrayList<>();
+                if(bucket.get("h" + block.getHeight()) != null)
+                    blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
+                blockList.add(block.getHash());
+
+                bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
+                tip = block.getHash();
+                lastHeight = block.getHeight();
+                pow.renewLastHeight(lastHeight);
+
+                UTXOSet utxoSet = new UTXOSet(this);
+                utxoSet.update(block);
+
+            } finally {
+                semaphore.release();
+            }
+        } catch (InterruptedException e) {}
     }
 
     public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
