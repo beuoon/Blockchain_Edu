@@ -70,6 +70,8 @@ public class Blockchain {
         Bucket bucket = db.getBucket("blocks");
 
         synchronized (mutexAddBlock) {
+            if (bucket.get(Utils.byteArrayToHexString(block.getHash())) != null) return false;
+
             // 이전 블록이 있는지 검사
             if (block.getHeight() > 0 && bucket.get(Utils.byteArrayToHexString(block.getPrevBlockHash())) == null)  { // 고아 블록
                 orphanBlocks.put(Utils.byteArrayToHexString(block.getHash()), block);
@@ -77,7 +79,7 @@ public class Blockchain {
             }
 
             // PoW 검증
-            ProofOfWork.Validate(block);
+            if (!ProofOfWork.Validate(block)) return false;
 
             // Tx 서명 및 UTXO 검증
             if (Arrays.equals(block.getPrevBlockHash(), tip)) { // 메인 체인 블록
@@ -237,8 +239,12 @@ public class Blockchain {
         Bucket bucket = db.getBucket("blocks");
         byte[] data = bucket.get(Utils.byteArrayToHexString(hash));
 
-        if (data == null) return null;
-        return Utils.toObject(data);
+        Block block = null;
+        if (data == null)
+            block = orphanBlocks.get(Utils.byteArrayToHexString(hash));
+        else
+            block = Utils.toObject(data);
+        return block;
     }
     public Transaction findTransaction(byte[] id) {
         Bucket bucket = db.getBucket("blocks");

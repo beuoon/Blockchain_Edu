@@ -16,7 +16,7 @@ public class Main {
         firstNode.createGenesisBlock(firstNode.getWallet().getAddress());
         nodes.add(firstNode);
 
-        final int NODE_NUM = 5;
+        final int NODE_NUM = 4;
         for (int i = 1; i < NODE_NUM; i++) {
             Node node = new Node();
             node.createWallet();
@@ -25,9 +25,8 @@ public class Main {
             nodes.add(node);
         }
 
-        for(Node node : nodes){
+        for(Node node : nodes)
             node.getNetwork().autoConnect(NODE_NUM-1);
-        }
 
         for(Node node : nodes)
             node.start();
@@ -36,6 +35,35 @@ public class Main {
 
         // Test
         int from = 0, to = 1;
+        while (true) {
+            nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10);
+            from = to;
+            to = (to + 1) % NODE_NUM;
+
+            System.out.println("입력 please");
+            if (scanner.next().equals("end"))
+                break;
+        }
+
+        for (Node node : nodes)
+            node.getNetwork().closeConnection();
+
+        nodes.get(0).getNetwork().connectTo(nodes.get(1).getNodeId(), nodes.get(0).getNodeId());
+        nodes.get(2).getNetwork().connectTo(nodes.get(3).getNodeId(), nodes.get(2).getNodeId());
+
+        while (true) {
+            nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10);
+            from = to;
+            to = (to + 1) % NODE_NUM;
+
+            System.out.println("입력 please");
+            if (scanner.next().equals("end"))
+                break;
+        }
+
+        nodes.get(1).getNetwork().connectTo(nodes.get(2).getNodeId(), nodes.get(1).getNodeId());
+
+        // Test
         while (true) {
             nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10);
             from = to;

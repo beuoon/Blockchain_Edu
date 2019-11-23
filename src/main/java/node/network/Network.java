@@ -67,6 +67,9 @@ public class Network {
             }
         }
     }
+    public void closeConnection() {
+        connList.clear();
+    }
     
     public void requestBlocks() {
     }

@@ -21,6 +21,7 @@ public class Node extends Thread implements EventListener {
 
     private String nodeId;
     private boolean bLoop = true;
+    private boolean bMining = false;
 
     // WalletT
     private Wallets wallets;
@@ -30,7 +31,7 @@ public class Node extends Thread implements EventListener {
     private Db db;
     private Blockchain bc;
     private Mempool<String, Transaction> mempool = new Mempool<>();
-    private HashSet<String> invBlock = new HashSet<>(), invTx = new HashSet<>();
+    private HashSet<String> invBlock = new HashSet<>(), invTx = new HashSet<>(); // TODO: sync and mempool
 
     // Network
     private Network network;
@@ -111,16 +112,28 @@ public class Node extends Thread implements EventListener {
 
     @Override
     public void run() {
+
         while (bLoop) {
-            try { sleep(100L); } catch (InterruptedException ignored) {}
+            try { sleep(1L); } catch (InterruptedException ignored) {}
 
             getInv();
-            mineBlock();
+            if (!bMining) {
+                bMining = true;
+                new Thread(new Runnable() {
+                    public void run() {
+                        mineBlock();
+                        bMining = false;
+                    }
+                }).start();
+            }
 
             // 고아 블록 처리
             Mempool<String, Block> orphanBlocks = bc.getOrphanBlock();
-            for (Block block : orphanBlocks.values())
-                invBlock.add(Utils.byteArrayToHexString(block.getPrevBlockHash()));
+            for (Block block : orphanBlocks.values()) {
+                String prevBlock = Utils.byteArrayToHexString(block.getPrevBlockHash());
+                if (!orphanBlocks.containsKey(prevBlock))
+                    invBlock.add(prevBlock);
+            }
             bc.addOrphanBlock();
         }
     }
@@ -143,8 +156,8 @@ public class Node extends Thread implements EventListener {
                 Transaction tx = iter.next();
                 String key = Utils.byteArrayToHexString(tx.getId());
 
-                // tx 검증
-                if (!bc.verifyTransaction(tx)) { // 고아 거래 또는 잘못된 거래
+                // Tx 서명 검증
+                if (!bc.verifyTransaction(tx)) {
                     mempool.remove(key);
                     continue;
                 }
@@ -198,7 +211,6 @@ public class Node extends Thread implements EventListener {
         Block block = Utils.toObject(data);
 
         invBlock.remove(Utils.byteArrayToHexString(block.getHash()));
-        if (db.getBucket("blocks").get(Utils.byteArrayToHexString(block.getHash())) != null) return;
 
         if (!bc.addBlock(block)) return;
         System.out.println(nodeId + "에 " + Utils.byteArrayToHexString(block.getHash()) + " 블록이 추가 되었습니다.");
@@ -206,6 +218,10 @@ public class Node extends Thread implements EventListener {
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())
             mempool.remove(Utils.byteArrayToHexString(tx.getId()));
+
+        // 전파
+        for (String _nodeId : network.getConnList())
+            network.sendInv(_nodeId, Network.TYPE.BLOCK, block.getHash());
     }
 
     private void handleInv(String from, byte[] data) {
@@ -220,7 +236,7 @@ public class Node extends Thread implements EventListener {
                     String hash = Utils.byteArrayToHexString(item);
 
                     if (!invBlock.contains(hash) && bc.findBlock(item) == null)
-                        network.sendGetData(from, Network.TYPE.BLOCK, item); // invBlock.add(hash);
+                        invBlock.add(hash);
                 }
                 break;
 
@@ -261,6 +277,8 @@ public class Node extends Thread implements EventListener {
 
                 if (block != null)
                     network.sendBlock(from, block);
+                else
+                    invBlock.add(Utils.byteArrayToHexString(hash));
                 break;
             case Network.TYPE.TX:
                 String id = Utils.byteArrayToHexString(hash);
@@ -273,6 +291,8 @@ public class Node extends Thread implements EventListener {
 
                 if (tx != null)
                     network.sendTx(from, tx);
+                else
+                    invTx.add(Utils.byteArrayToHexString(hash));
         }
     }
     private void handleTx(String from, byte[] data) {
@@ -319,7 +339,6 @@ public class Node extends Thread implements EventListener {
 
             String nodeId = clients.get(random.nextInt(clients.size()));
             network.sendGetData(nodeId, Network.TYPE.BLOCK, Utils.hexStringToByteArray(hash));
-            // invBlock.remove(hash);
         }
 
         Iterator<String> txIter = invTx.iterator();
@@ -328,7 +347,6 @@ public class Node extends Thread implements EventListener {
 
             String nodeId = clients.get(random.nextInt(clients.size()));
             network.sendGetData(nodeId, Network.TYPE.TX, Utils.hexStringToByteArray(hash));
-            // invTx.remove(hash);
         }
     }
 
