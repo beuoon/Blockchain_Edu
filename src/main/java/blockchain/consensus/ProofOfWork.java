@@ -9,7 +9,7 @@ import java.math.BigInteger;
 import java.util.EventListener;
 
 public class ProofOfWork {
-    static final int targetBits = 18;
+    static final int targetBits = 20;
     static final BigInteger target = new BigInteger("1").shiftLeft(256-targetBits);
     private int lastHeight = -1;
 

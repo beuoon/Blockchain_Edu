@@ -45,7 +45,7 @@ public class Network {
 
         while(num > 0) {
             Random rand = new Random();
-            int idx = Math.abs(rand.nextInt()) % nodes.size();
+            int idx = rand.nextInt(nodes.size());
             Node node = nodes.get(idx);
 
             if (node == self) continue;

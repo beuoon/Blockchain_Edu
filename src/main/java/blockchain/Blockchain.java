@@ -36,7 +36,7 @@ public class Blockchain {
 
         this.db = db;
         this.tip = genesisBlock.getHash();
-        this.lastHeight = -1;
+        this.lastHeight = 0;
         ArrayList<byte[]> blockList = new ArrayList<>();
 
         if(b.get("h" + genesisBlock.getHeight()) != null)
@@ -352,10 +352,6 @@ public class Blockchain {
 
     public Db getDb() {
         return db;
-    }
-
-    public boolean validate() {
-        return tip != null;
     }
 
     public Iterator<Block> iterator() {

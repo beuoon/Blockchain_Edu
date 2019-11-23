@@ -74,7 +74,7 @@ public class UTXOSet {
                     TxOutputs outs = Utils.toObject(b.get(Utils.byteArrayToHexString(vin.getTxId())));
 
                     if (outs.getOutputs().containsKey(vin.getvOut()))
-                        outs.getOutputs().remove(vin);
+                        outs.getOutputs().remove(vin.getvOut());
 
                     if(outs.getOutputs().isEmpty()) b.delete(Utils.byteArrayToHexString(vin.getTxId()));
                     else b.put(Utils.byteArrayToHexString(vin.getTxId()), Utils.toBytes(outs));

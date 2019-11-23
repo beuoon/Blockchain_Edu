@@ -1,6 +1,5 @@
 package node.network;
 
-import DB.Bucket;
 import DB.Db;
 import blockchain.*;
 import blockchain.transaction.*;
@@ -11,10 +10,7 @@ import node.event.EventHandler;
 import node.event.EventListener;
 import utils.Utils;
 
-import java.security.SecureRandom;
 import java.util.*;
-
-import static java.lang.Thread.sleep;
 
 public class Node extends Thread implements EventListener {
     public static int NodeCount = 0;
@@ -65,18 +61,10 @@ public class Node extends Thread implements EventListener {
         wallet = wallets.getWallet(address);
     }
 
-    public ArrayList<String> getAddresses() {
-        return wallets.getAddresses();
-    }
-    ///
+    public ArrayList<String> getAddresses() { return wallets.getAddresses(); }
 
-    public Network getNetwork() {
-        return network;
-    }
-
-    public void createGenesisBlock(String address) {
-        this.bc = new Blockchain(address, this.db);
-    }
+    // Genesis Block
+    public void createGenesisBlock(String address) { this.bc = new Blockchain(address, this.db); }
 
     //임시 메소드임!
     public void createNullBlockchain() {
@@ -96,17 +84,25 @@ public class Node extends Thread implements EventListener {
         utxoSet.reIndex();
     }
 
+    public Network getNetwork() {
+        return network;
+    }
+
     // TEST
     public void send(String to, int amount) {
         UTXOSet utxoSet = new UTXOSet(bc);
+        Transaction tx;
         try {
-            Transaction tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
-            mempool.put(Utils.byteArrayToHexString(tx.getId()), tx);
-            for (String _nodeId : network.getConnList())
-                network.sendTx(_nodeId, tx);
+            tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
         } catch (Exception e) {
             System.out.println(nodeId + "node" + e);
+            return ;
         }
+
+        System.out.printf("'%s'가 '%s'에게 %d 전송\n", wallet.getAddress(), to, amount);
+        mempool.put(Utils.byteArrayToHexString(tx.getId()), tx);
+        for (String _nodeId : network.getConnList())
+            network.sendTx(_nodeId, tx);
     }
 
     public void checkBalance() {
@@ -116,36 +112,23 @@ public class Node extends Thread implements EventListener {
 
     @Override
     public void run() {
-        if (!bc.validate()) {
-            while (bLoop && !bc.validate()) {
-                Random random = new Random();
-                ArrayList<String> nodeIds = network.getConnList();
-                String client = nodeIds.get(random.nextInt(nodeIds.size()));
-
-                network.sendGetBlocks(client);
-                try {
-                    sleep(1000);
-                } catch (InterruptedException ignored) {}
-            }
-        }
-
         while (bLoop) {
-            try {
-                sleep(100L);
-            } catch (InterruptedException ignored) {}
+            try { sleep(100L); } catch (InterruptedException ignored) {}
 
             getInv();
             mineBlock();
         }
     }
 
-    private void mineBlock() {
-        if (!bc.validate()) return ; // blockchain 준비 안됨
+    public void close() {
+        bLoop = false;
+    }
 
+    private void mineBlock() {
         // Transaction 준비
         Transaction[] txs = null;
 
-        if (mempool.size() >= 2) {
+        if (mempool.size() >= 1) {
             ArrayList<Transaction> txList = new ArrayList<>();
             Iterator<Transaction> iter = mempool.values().iterator();
 
@@ -196,26 +179,18 @@ public class Node extends Thread implements EventListener {
         if (txs == null) return; // 채굴 안함
 
 
-        System.out.println(nodeId + "번 노드 채굴 시작");
         Block newBlock = bc.mineBlock(txs);
-        if (newBlock == null) {
-            // System.out.println(nodeId + "번 노드 채굴 실패");
+        if (newBlock == null)
             return; // 채굴 실패
-        }
-        System.out.println(nodeId + "번 노드 블록 " + Utils.byteArrayToHexString(newBlock.getHash()) + " 채굴 성공!!");
+        System.out.println(nodeId + "이 " + Utils.byteArrayToHexString(newBlock.getHash()) + " 블록을 채굴!!");
 
         // 블록내 트랜잭션 pool 에서 제거
-
         for (Transaction tx : newBlock.getTransactions())
             mempool.remove(Utils.byteArrayToHexString(tx.getId()));
 
         // 블록 전파
         for (String _nodeId : network.getConnList())
             network.sendInv(_nodeId, Network.TYPE.BLOCK, newBlock.getHash());
-    }
-
-    public void close() {
-        bLoop = false;
     }
 
     private void handleBlock(byte[] data) {
@@ -233,11 +208,9 @@ public class Node extends Thread implements EventListener {
             utxoSet.reIndex();
         }
         else {
-            // System.out.println("node"+getNodeId()+ "normal");
-            System.out.println(nodeId + "에 " + Utils.byteArrayToHexString(block.getHash()) + " 블록이 추가 되려고합니다.");
             if (!bc.addBlock(block))
                 return;
-            System.out.println(nodeId + "에 블록이 추가 되었습니다.");
+            System.out.println(nodeId + "에 " + Utils.byteArrayToHexString(block.getHash()) + " 블록이 추가 되었습니다.");
         }
 
         // 블록내 트랜잭션 pool 에서 제거
@@ -320,7 +293,6 @@ public class Node extends Thread implements EventListener {
 
         if (!mempool.containsKey(id)) {
             mempool.put(id, tx);
-            // System.out.println("Tx "+ nodeId + ": " + id);
 
             // 전파
             for (String _nodeId : network.getConnList()){
@@ -337,12 +309,12 @@ public class Node extends Thread implements EventListener {
         byte[] data = Arrays.copyOfRange(buff, 1, buff.length);
 
         switch (TYPE) {
-            case Network.TYPE.BLOCK:    handleBlock(data);              break;
+            case Network.TYPE.BLOCK:    handleBlock(data);            break;
             case Network.TYPE.INV:      handleInv(from, data);        break;
             case Network.TYPE.GETBLOCK: handleGetBlocks(from);        break;
             case Network.TYPE.GETDATA:  handleGetData(from, data);    break;
             case Network.TYPE.TX:       handleTx(from, data);         break;
-            case Network.TYPE.VERSION:  handleVersion(data);            break;
+            case Network.TYPE.VERSION:  handleVersion(data);          break;
         }
     }
 
