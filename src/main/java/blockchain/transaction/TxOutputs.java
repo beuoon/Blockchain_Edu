@@ -2,15 +2,16 @@ package blockchain.transaction;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class TxOutputs implements Serializable {
-    public ArrayList<TxOutput> getOutputs(){
+    public HashMap<Integer, TxOutput> getOutputs(){
         return Outputs;
     }
 
-    public void setOutputs(ArrayList<TxOutput> outputs) {
+    public void setOutputs(HashMap<Integer, TxOutput> outputs) {
         Outputs = outputs;
     }
 
-    private ArrayList<TxOutput> Outputs = new ArrayList<>();
+    private HashMap<Integer, TxOutput> Outputs = new HashMap<>();
 }

@@ -48,6 +48,7 @@ public class Network {
             int idx = Math.abs(rand.nextInt()) % nodes.size();
             Node node = nodes.get(idx);
 
+            if (node == self) continue;
             if(connList.contains(node)) continue;
 
             connList.add(node);

@@ -63,67 +63,99 @@ public class Blockchain {
         Block newBlock = new Block(transactions, lastHash, lastBlock.getHeight()+1);
         if(!pow.mine(newBlock)) return null;
 
-        secureAddBlock(newBlock);
+        if (!addBlock(newBlock))
+            return null;
 
         return newBlock;
     }
 
     public boolean addBlock(Block block) {
         Bucket bucket = db.getBucket("blocks");
-       //블록이 PoW를 만족하는가?
-        ProofOfWork.Validate(block);
 
-        // 트랜잭션 검증
-        for (Transaction tx : block.getTransactions()) {
-                if (!verifyTransaction(tx)) return false;
-        }
+        try {
+            semaphore.acquire();
 
-        // TODO: 블록 검증
-        // 포크
+            try {
+                // 블록이 PoW를 만족하는가?
+                ProofOfWork.Validate(block);
 
-        //지금 온 블록이 최신 블록 보다 작거나 같으면?
-        if(block.getHeight() <= lastHeight) {
-            if(bucket.get("h"+ (block.getHeight()-1)) == null) {
-                System.out.println((block.getHeight()-1) +" "+ lastHeight );
-            }
+                // 트랜잭션 검증
+                for (Transaction tx : block.getTransactions()) {
+                    if (!verifyTransaction(tx)) return false;
 
-            ArrayList<byte[]> hashList = Utils.toObject(bucket.get("h"+ (block.getHeight()-1)));
-            for(byte[] hash : hashList) {
-                Block b = Utils.toObject(bucket.get(Utils.byteArrayToHexString(hash)));
-                if(Arrays.equals(b.getHash(), block.getPrevBlockHash())) {
-                    ArrayList<byte[]> blockList = new ArrayList<>();
+                    if (tx.isCoinBase()) continue;
 
-                    if(bucket.get("h" + block.getHeight()) != null)
-                        blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
-                    blockList.add(block.getHash());
+                    UTXOSet utxoSet = new UTXOSet(this);
+                    for (TxInput vin : tx.getVin())
+                        if (!utxoSet.validVin(vin)) return false;
+                }
 
-                    bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
-                    bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+
+                // 블록 검증 및 포크
+                // 지금 온 블록이 최신 블록 보다 작거나 같으면?
+                if(block.getHeight() <= lastHeight) {
+                    if(bucket.get("h"+ (block.getHeight()-1)) == null) {
+                        System.out.println((block.getHeight()-1) +" "+ lastHeight );
+                    }
+
+                    ArrayList<byte[]> hashList = Utils.toObject(bucket.get("h"+ (block.getHeight()-1)));
+                    for(byte[] hash : hashList) {
+                        Block b = Utils.toObject(bucket.get(Utils.byteArrayToHexString(hash)));
+                        if(Arrays.equals(b.getHash(), block.getPrevBlockHash())) {
+                            ArrayList<byte[]> blockList = new ArrayList<>();
+
+                            if(bucket.get("h" + block.getHeight()) != null)
+                                blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
+                            blockList.add(block.getHash());
+
+                            bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
+                            bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+                            return false;
+                        }
+                    }
                     return false;
                 }
-            }
-            return false;
-        }
 
-        if(block.getHeight() > lastHeight+1) {
-            mempool.put(Utils.byteArrayToHexString(block.getHash()), block);
-            return false;
-        }
-
-        //이 블록이 내 최신높이에 있는 블록의 다음블록이 맞느냐?
-        if(block.getHeight() != 0) {
-            boolean flag = false;
-            ArrayList<byte[]> lasthashList = Utils.toObject(bucket.get("h" + (block.getHeight() - 1)));
-            for (byte[] lasthash : lasthashList) {
-                Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lasthash)));
-                if (Arrays.equals(block.getPrevBlockHash(), lastBlock.getHash())) {
-                    flag = true;
+                if(block.getHeight() > lastHeight+1) {
+                    mempool.put(Utils.byteArrayToHexString(block.getHash()), block);
+                    return false;
                 }
-            }
-            if (!flag) return false;
-        }
 
-        secureAddBlock(block);
+                // 이 블록이 내 최신높이에 있는 블록의 다음블록이 맞느냐?
+                if(block.getHeight() != 0) {
+                    boolean flag = false;
+                    ArrayList<byte[]> lasthashList = Utils.toObject(bucket.get("h" + (block.getHeight() - 1)));
+                    for (byte[] lasthash : lasthashList) {
+                        Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lasthash)));
+                        if (Arrays.equals(block.getPrevBlockHash(), lastBlock.getHash())) {
+                            flag = true;
+                        }
+                    }
+                    if (!flag) return false;
+                }
+
+                // 블록 추가
+                bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+                bucket.put("l", block.getHash());
+
+                ArrayList<byte[]> blockList = new ArrayList<>();
+                if (bucket.get("h" + block.getHeight()) != null)
+                    blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
+                blockList.add(block.getHash());
+
+                bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
+                tip = block.getHash();
+                lastHeight = block.getHeight();
+                pow.renewLastHeight(lastHeight);
+
+                if (block.getHeight() > 0) {
+                    UTXOSet utxoSet = new UTXOSet(this);
+                    utxoSet.update(block);
+                }
+            } finally {
+                semaphore.release();
+            }
+        } catch (InterruptedException e) {}
 
         Iterator<Block> itr = mempool.values().iterator();
         while(itr.hasNext()){
@@ -135,35 +167,6 @@ public class Blockchain {
         }
 
         return true;
-    }
-
-    private void secureAddBlock(Block block) {
-        Bucket bucket = db.getBucket("blocks");
-
-        try {
-            semaphore.acquire();
-
-            try {
-                bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
-                bucket.put("l", block.getHash());
-
-                ArrayList<byte[]> blockList = new ArrayList<>();
-                if(bucket.get("h" + block.getHeight()) != null)
-                    blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
-                blockList.add(block.getHash());
-
-                bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
-                tip = block.getHash();
-                lastHeight = block.getHeight();
-                pow.renewLastHeight(lastHeight);
-
-                UTXOSet utxoSet = new UTXOSet(this);
-                utxoSet.update(block);
-
-            } finally {
-                semaphore.release();
-            }
-        } catch (InterruptedException e) {}
     }
 
     public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
@@ -240,7 +243,7 @@ public class Blockchain {
                         outs = new TxOutputs();
                         UTXO.put(txId, outs);
                     }
-                    outs.getOutputs().add(out);
+                    outs.getOutputs().put(outIdx, out);
                     UTXO.put(txId, outs);
                 }
 

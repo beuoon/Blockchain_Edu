@@ -156,8 +156,10 @@ public class Node extends Thread implements EventListener {
                 String key = Utils.byteArrayToHexString(tx.getId());
 
                 // tx 검증
-                if (!bc.validateTransaction(tx)) // TODO: 고아 거래 처리
+                if (!bc.validateTransaction(tx)) { // TODO: 고아 거래 처리
+                    mempool.remove(key);
                     continue;
+                }
 
                 if (!bc.verifyTransaction(tx)) { // 잘못된 거래
                     mempool.remove(key);
@@ -166,9 +168,10 @@ public class Node extends Thread implements EventListener {
 
                 //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
                 // vin 확인
+                UTXOSet utxoSet = new UTXOSet(bc);
                 boolean canUse = true;
                 for (TxInput vin : tx.getVin()) {
-                    if (usedVin.contains(vin)) {
+                    if (usedVin.contains(vin) || !utxoSet.validVin(vin)) {
                         canUse = false;
                         break;
                     }
@@ -196,10 +199,10 @@ public class Node extends Thread implements EventListener {
         System.out.println(nodeId + "번 노드 채굴 시작");
         Block newBlock = bc.mineBlock(txs);
         if (newBlock == null) {
-            System.out.println(nodeId + "번 노드 채굴 실패");
+            // System.out.println(nodeId + "번 노드 채굴 실패");
             return; // 채굴 실패
         }
-        System.out.println(nodeId + "번 노드 블록 채굴 성공!!");
+        System.out.println(nodeId + "번 노드 블록 " + Utils.byteArrayToHexString(newBlock.getHash()) + " 채굴 성공!!");
 
         // 블록내 트랜잭션 pool 에서 제거
 
@@ -231,7 +234,7 @@ public class Node extends Thread implements EventListener {
         }
         else {
             // System.out.println("node"+getNodeId()+ "normal");
-            System.out.println(nodeId + "에 블록이 추가 되려고합니다.");
+            System.out.println(nodeId + "에 " + Utils.byteArrayToHexString(block.getHash()) + " 블록이 추가 되려고합니다.");
             if (!bc.addBlock(block))
                 return;
             System.out.println(nodeId + "에 블록이 추가 되었습니다.");
