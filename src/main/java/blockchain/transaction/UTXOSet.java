@@ -32,7 +32,17 @@ public class UTXOSet {
 
             db.getBucket(utxoBucket).put(txId, Utils.toBytes(outs));
         }
+    }
 
+    public void reIndex(HashMap<String, TxOutputs> utxoset) {
+        db.getBucket(utxoBucket).clear();
+        Iterator<String> itr = utxoset.keySet().iterator();
+        while(itr.hasNext()){
+            String txId = itr.next();
+            TxOutputs outs = utxoset.get(txId);
+
+            db.getBucket(utxoBucket).put(txId, Utils.toBytes(outs));
+        }
     }
 
     public ArrayList<TxOutput> findUTXO(byte[] pubkeyHash) {
@@ -97,6 +107,14 @@ public class UTXOSet {
         if (temp == null) return false;
 
         TxOutputs txOutputs = Utils.toObject(temp);
+        return txOutputs.getOutputs().containsKey(txInput.getvOut());
+    }
+
+    public boolean validVin(TxInput txInput, HashMap<String, TxOutputs> utxoset) {
+        TxOutputs txOutputs = utxoset.get(Utils.byteArrayToHexString(txInput.getTxId()));
+        if(txOutputs == null){
+            return false;
+        }
         return txOutputs.getOutputs().containsKey(txInput.getvOut());
     }
     public Pair<Integer, HashMap<String, ArrayList<Integer>>> findSpendableOutputs(byte[] pubkeyHash, int amount) {

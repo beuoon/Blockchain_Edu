@@ -69,6 +69,22 @@ public class Blockchain {
         return newBlock;
     }
 
+
+    private boolean txVerify(Block block){
+        return txVerify(block, findUTXO());
+    }
+    private boolean txVerify(Block block, HashMap<String, TxOutputs> utxoset) {
+        for (Transaction tx : block.getTransactions()) {
+            if (!verifyTransaction(tx)) return false;
+            if(block.getHeight() == lastHeight){}
+
+            UTXOSet utxoSet = new UTXOSet(this);
+            for (TxInput vin : tx.getVin())
+                if (!utxoSet.validVin(vin, utxoset)) return false;
+        }
+        return true;
+    }
+
     public boolean addBlock(Block block) {
         Bucket bucket = db.getBucket("blocks");
 
@@ -76,31 +92,18 @@ public class Blockchain {
             // 블록이 PoW를 만족하는가?
             ProofOfWork.Validate(block);
 
-            // 트랜잭션 검증
-            /*
-            for (Transaction tx : block.getTransactions()) {
-                if (!verifyTransaction(tx)) return false;
-
-                /* // 체인을 다를 경우 제외
-                UTXOSet utxoSet = new UTXOSet(this);
-                for (TxInput vin : tx.getVin())
-                    if (!utxoSet.validVin(vin)) return false;
-
-            }
-                 */
-
-
             // 블록 검증 및 포크
-            // 지금 온 블록이 최신 블록 보다 작거나 같으면?
+            // 지금 온 블록이 최신 블록 보다 작거나 같으면 포크가 일어남?
             if (block.getHeight() <= lastHeight) {
-                if (bucket.get("h" + (block.getHeight() - 1)) == null) {
-                    System.out.println((block.getHeight() - 1) + " " + lastHeight);
-                }
-
-                ArrayList<byte[]> hashList = Utils.toObject(bucket.get("h" + (block.getHeight() - 1)));
-                for (byte[] hash : hashList) {
+                System.out.println("포크 발생!");
+                ArrayList<byte[]> prevBlockHashList = Utils.toObject(bucket.get("h" + (block.getHeight() - 1)));
+                for (byte[] hash : prevBlockHashList) {
                     Block b = Utils.toObject(bucket.get(Utils.byteArrayToHexString(hash)));
                     if (Arrays.equals(b.getHash(), block.getPrevBlockHash())) {
+                        //해당 블록을 검증하기 위해 해당 블록을 검증하기  위해 UTXO 집합을 만든다.
+                        HashMap<String, TxOutputs> utxoset = findUTXO(b.getHash());
+                        if(!txVerify(block, utxoset)) return false;
+
                         ArrayList<byte[]> blockList = new ArrayList<>();
 
                         if (bucket.get("h" + block.getHeight()) != null)
@@ -132,6 +135,8 @@ public class Blockchain {
                 }
                 if (!flag) return false;
             }
+
+            System.out.println("분기!");
 
             // 블록 추가
             bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
@@ -216,7 +221,11 @@ public class Blockchain {
         return unspentTxs;
     }
 
-    public HashMap<String, TxOutputs> findUTXO() {
+    public HashMap<String, TxOutputs> findUTXO(){
+        return findUTXO(tip);
+    }
+
+    public HashMap<String, TxOutputs> findUTXO(byte[] tip) {
         HashMap<String, TxOutputs> UTXO = new HashMap<>();
         HashMap<String, ArrayList<Integer>> spentTXOs = new HashMap<>();
 
@@ -340,6 +349,10 @@ public class Blockchain {
     }
 
     public Iterator<Block> iterator() {
+        return new BcItr(db, tip);
+    }
+
+    public Iterator<Block> iterator(byte[] tip) {
         return new BcItr(db, tip);
     }
 
