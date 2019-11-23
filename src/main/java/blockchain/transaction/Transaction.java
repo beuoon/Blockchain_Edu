@@ -68,8 +68,8 @@ public class Transaction implements Serializable {
         if(isCoinBase()) return true;
 
         for(TxInput vin : Vin) {
-            if(prevTxs.get(Utils.byteArrayToHexString(vin.getTxId())) == null){
-                new Exception("ERROR: Rrevious transaction is not correct").printStackTrace();            }
+            if(prevTxs.get(Utils.byteArrayToHexString(vin.getTxId())) == null)
+                new Exception("ERROR: Rrevious transaction is not correct").printStackTrace();
         }
 
         Transaction txCopy = trimmedCopy();

@@ -23,7 +23,6 @@ public class Node extends Thread implements EventListener {
     private boolean bLoop = true;
 
     // WalletT
-
     private Wallets wallets;
     private Wallet wallet;
 
@@ -95,7 +94,7 @@ public class Node extends Thread implements EventListener {
         try {
             tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
         } catch (Exception e) {
-            System.out.println(nodeId + "node" + e);
+            System.out.println(nodeId + ": " + e);
             return ;
         }
 
@@ -139,12 +138,7 @@ public class Node extends Thread implements EventListener {
                 String key = Utils.byteArrayToHexString(tx.getId());
 
                 // tx 검증
-                if (!bc.validateTransaction(tx)) { // TODO: 고아 거래 처리
-                    mempool.remove(key);
-                    continue;
-                }
-
-                if (!bc.verifyTransaction(tx)) { // 잘못된 거래
+                if (!bc.verifyTransaction(tx)) { // 고아 거래 또는 잘못된 거래
                     mempool.remove(key);
                     continue;
                 }
@@ -182,6 +176,7 @@ public class Node extends Thread implements EventListener {
         Block newBlock = bc.mineBlock(txs);
         if (newBlock == null)
             return; // 채굴 실패
+
         System.out.println(nodeId + "이 " + Utils.byteArrayToHexString(newBlock.getHash()) + " 블록을 채굴!!");
 
         // 블록내 트랜잭션 pool 에서 제거

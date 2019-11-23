@@ -39,7 +39,7 @@ public class Network {
         return list;
     }
 
-    public void autoConnect(int num) {
+    public void autoConnect(int num) { // TODO: Fully Connection 아니면 네트워크 분리 될 가능성 있음
         if(connList.size() >= num) return;
         num -= connList.size();
 

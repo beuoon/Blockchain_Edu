@@ -43,7 +43,8 @@ public class UTXOSet {
 
         while(c.hasNext()){
             Pair<String, byte[]> kv = c.next();
-            TxOutputs outs = (TxOutputs)Utils.toObject(kv.getValue());
+            TxOutputs outs = Utils.toObject(kv.getValue());
+
             for(TxOutput out : outs.getOutputs().values()) {
                 if(out.isLockedWithKey(pubkeyHash)) {
                     UTXOs.add(out);
@@ -96,13 +97,10 @@ public class UTXOSet {
         if (temp == null) return false;
 
         TxOutputs txOutputs = Utils.toObject(temp);
-        if (txOutputs.getOutputs().containsKey(txInput.getvOut()))
-            return true;
-
-        return false;
+        return txOutputs.getOutputs().containsKey(txInput.getvOut());
     }
     public Pair<Integer, HashMap<String, ArrayList<Integer>>> findSpendableOutputs(byte[] pubkeyHash, int amount) {
-        HashMap<String, ArrayList<Integer>> unspentOutputs = new HashMap();
+        HashMap<String, ArrayList<Integer>> unspentOutputs = new HashMap<>();
         int accumulated = 0;
 
         Bucket b = db.getBucket(utxoBucket);
@@ -111,19 +109,20 @@ public class UTXOSet {
         while(c.hasNext()) {
             Pair<String, byte[]> kv = c.next();
             String txId = kv.getKey();
-            TxOutputs outs = (TxOutputs)Utils.toObject(kv.getValue());
+            TxOutputs outs = Utils.toObject(kv.getValue());
 
-            for (int i = 0; i < outs.getOutputs().size(); i++) {
-                TxOutput out = outs.getOutputs().get(i);
+            for (Integer key : outs.getOutputs().keySet()) {
+                TxOutput out = outs.getOutputs().get(key);
+
                 if(out.isLockedWithKey(pubkeyHash) && accumulated < amount) {
                     accumulated+= out.getValue();
-                    if(unspentOutputs.get(txId) == null) unspentOutputs.put(txId, new ArrayList<>());
-                    unspentOutputs.get(txId).add(i);
+                    if(!unspentOutputs.containsKey(txId)) unspentOutputs.put(txId, new ArrayList<>());
+                    unspentOutputs.get(txId).add(key);
                 }
             }
         }
 
-        return new Pair(accumulated, unspentOutputs);
+        return new Pair<>(accumulated, unspentOutputs);
     }
 
     public Blockchain getBc() {

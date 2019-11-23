@@ -5,6 +5,7 @@ import node.network.Node;
 import utils.Utils;
 
 import java.util.ArrayList;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String args[]) throws Exception {
@@ -15,7 +16,8 @@ public class Main {
         firstNode.createGenesisBlock(firstNode.getWallet().getAddress());
         nodes.add(firstNode);
 
-        for (int i = 1; i < 4; i++) {
+        final int NODE_NUM = 5;
+        for (int i = 1; i < NODE_NUM; i++) {
             Node node = new Node();
             node.createWallet();
             node.createNullBlockchain();
@@ -24,24 +26,25 @@ public class Main {
         }
 
         for(Node node : nodes){
-            node.getNetwork().autoConnect(3);
+            node.getNetwork().autoConnect(NODE_NUM-1);
         }
 
         for(Node node : nodes)
             node.start();
 
+        Scanner scanner = new Scanner(System.in);
+
         // Test
-        nodes.get(0).send(nodes.get(1).getWallet().getAddress(), 30);
+        int from = 0, to = 1;
+        while (true) {
+            nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10);
+            from = to;
+            to = (to + 1) % NODE_NUM;
 
-        Thread.sleep(10000);
-
-        for (Node node: nodes)
-            node.checkBalance();
-
-        nodes.get(0).send(nodes.get(3).getWallet().getAddress(), 20);
-        nodes.get(1).send(nodes.get(3).getWallet().getAddress(), 10);
-
-        Thread.sleep(10000);
+            System.out.println("입력 please");
+            if (scanner.next().equals("end"))
+                break;
+        }
 
         for (Node node: nodes)
             node.checkBalance();
