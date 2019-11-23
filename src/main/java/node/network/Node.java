@@ -116,6 +116,12 @@ public class Node extends Thread implements EventListener {
 
             getInv();
             mineBlock();
+
+            // 고아 블록 처리
+            Mempool<String, Block> orphanBlocks = bc.getOrphanBlock();
+            for (Block block : orphanBlocks.values())
+                invBlock.add(Utils.byteArrayToHexString(block.getPrevBlockHash()));
+            bc.addOrphanBlock();
         }
     }
 
@@ -191,22 +197,11 @@ public class Node extends Thread implements EventListener {
     private void handleBlock(byte[] data) {
         Block block = Utils.toObject(data);
 
-        if( db.getBucket("blocks").get(Utils.byteArrayToHexString(block.getHash())) != null )
-            return;
-
         invBlock.remove(Utils.byteArrayToHexString(block.getHash()));
+        if (db.getBucket("blocks").get(Utils.byteArrayToHexString(block.getHash())) != null) return;
 
-        if (block.getHeight() == 0) {
-
-            // UTXO reindex
-            UTXOSet utxoSet = new UTXOSet(bc);
-            utxoSet.reIndex();
-        }
-        else {
-            if (!bc.addBlock(block))
-                return;
-            System.out.println(nodeId + "에 " + Utils.byteArrayToHexString(block.getHash()) + " 블록이 추가 되었습니다.");
-        }
+        if (!bc.addBlock(block)) return;
+        System.out.println(nodeId + "에 " + Utils.byteArrayToHexString(block.getHash()) + " 블록이 추가 되었습니다.");
 
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())

@@ -12,7 +12,6 @@ import utils.Utils;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
-import java.util.concurrent.Semaphore;
 
 public class Blockchain {
     private Db db;
@@ -20,8 +19,8 @@ public class Blockchain {
     int lastHeight;
 
     private ProofOfWork pow = new ProofOfWork();
-    Mempool<String, Block> mempool = new Mempool<>();
-    private Object mutexAddBlock = new Object();
+    private Mempool<String, Block> orphanBlocks = new Mempool<>();
+    private final Object mutexAddBlock = new Object();
 
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
 
@@ -48,10 +47,9 @@ public class Blockchain {
         UTXOSet utxoSet = new UTXOSet(this);
         utxoSet.reIndex();
     }
-
     public Blockchain(Db db) {
         this.db = db;
-        this.tip = null;
+        this.tip = new byte[]{};
         this.lastHeight = -1;
     }
 
@@ -68,111 +66,70 @@ public class Blockchain {
 
         return newBlock;
     }
-
-
-    private boolean txVerify(Block block){
-        return txVerify(block, findUTXO());
-    }
-    private boolean txVerify(Block block, HashMap<String, TxOutputs> utxoset) {
-        for (Transaction tx : block.getTransactions()) {
-            if (!verifyTransaction(tx)) return false;
-            if(block.getHeight() == lastHeight){}
-
-            UTXOSet utxoSet = new UTXOSet(this);
-            for (TxInput vin : tx.getVin())
-                if (!utxoSet.validVin(vin, utxoset)) return false;
-        }
-        return true;
-    }
-
     public boolean addBlock(Block block) {
         Bucket bucket = db.getBucket("blocks");
 
         synchronized (mutexAddBlock) {
-            // 블록이 PoW를 만족하는가?
+            // 이전 블록이 있는지 검사
+            if (block.getHeight() > 0 && bucket.get(Utils.byteArrayToHexString(block.getPrevBlockHash())) == null)  { // 고아 블록
+                orphanBlocks.put(Utils.byteArrayToHexString(block.getHash()), block);
+                return false;
+            }
+
+            // PoW 검증
             ProofOfWork.Validate(block);
 
-            // 블록 검증 및 포크
-            // 지금 온 블록이 최신 블록 보다 작거나 같으면 포크가 일어남?
-            if (block.getHeight() <= lastHeight) {
-                System.out.println("포크 발생!");
-                ArrayList<byte[]> prevBlockHashList = Utils.toObject(bucket.get("h" + (block.getHeight() - 1)));
-                for (byte[] hash : prevBlockHashList) {
-                    Block b = Utils.toObject(bucket.get(Utils.byteArrayToHexString(hash)));
-                    if (Arrays.equals(b.getHash(), block.getPrevBlockHash())) {
-                        //해당 블록을 검증하기 위해 해당 블록을 검증하기  위해 UTXO 집합을 만든다.
-                        HashMap<String, TxOutputs> utxoset = findUTXO(b.getHash());
-                        if(!txVerify(block, utxoset)) return false;
-
-                        ArrayList<byte[]> blockList = new ArrayList<>();
-
-                        if (bucket.get("h" + block.getHeight()) != null)
-                            blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
-                        blockList.add(block.getHash());
-
-                        bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
-                        bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
-                        return false;
-                    }
-                }
-                return false;
+            // Tx 서명 및 UTXO 검증
+            if (Arrays.equals(block.getPrevBlockHash(), tip)) { // 메인 체인 블록
+                if (!validTransaction(block)) return false;
             }
-
-            if (block.getHeight() > lastHeight + 1) {
-                mempool.put(Utils.byteArrayToHexString(block.getHash()), block);
-                return false;
+            else { // 서브 체인 블록
+                HashMap<String, TxOutputs> utxoset = findUTXO(block.getPrevBlockHash());
+                if (!validTransaction(block, utxoset)) return false;
             }
-
-            // 이 블록이 내 최신높이에 있는 블록의 다음블록이 맞느냐?
-            if (block.getHeight() != 0) {
-                boolean flag = false;
-                ArrayList<byte[]> lasthashList = Utils.toObject(bucket.get("h" + (block.getHeight() - 1)));
-                for (byte[] lasthash : lasthashList) {
-                    Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lasthash)));
-                    if (Arrays.equals(block.getPrevBlockHash(), lastBlock.getHash())) {
-                        flag = true;
-                    }
-                }
-                if (!flag) return false;
-            }
-
-            System.out.println("분기!");
 
             // 블록 추가
-            bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
-            bucket.put("l", block.getHash());
-
             ArrayList<byte[]> blockList = new ArrayList<>();
             if (bucket.get("h" + block.getHeight()) != null)
                 blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
             blockList.add(block.getHash());
-
             bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
+
+            bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+
+            if (block.getHeight() <= lastHeight) return true;
+
+            // 체인 갱신
+            bucket.put("l", block.getHash());
+
             byte[] prevTip = tip;
             tip = block.getHash();
             lastHeight = block.getHeight();
             pow.renewLastHeight(lastHeight);
 
-            if (!Arrays.equals(prevTip, block.getPrevBlockHash())) {
+            if (!Arrays.equals(prevTip, block.getPrevBlockHash())) { // 체인 변경
                 UTXOSet utxoSet = new UTXOSet(this);
                 utxoSet.reIndex();
             }
-            else if (block.getHeight() > 0) {
+            else if (block.getHeight() > 0) { // 체인 유지
                 UTXOSet utxoSet = new UTXOSet(this);
                 utxoSet.update(block);
             }
         }
 
-        Iterator<Block> itr = mempool.values().iterator();
-        while(itr.hasNext()){
-            Block b = itr.next();
-            if(b.getHeight() == lastHeight+1) {
-                addBlock(b);
-                break;
+        return true;
+    }
+
+    public Mempool<String, Block> getOrphanBlock() { return orphanBlocks; }
+    public void addOrphanBlock() {
+        Bucket bucket = db.getBucket("blocks");
+
+        for (Block b : orphanBlocks.values()) {
+            if (bucket.get(Utils.byteArrayToHexString(b.getPrevBlockHash())) != null) {
+                if (addBlock(b))
+                    orphanBlocks.remove(Utils.byteArrayToHexString(b.getHash()));
             }
         }
-
-        return true;
     }
 
     public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
@@ -221,15 +178,12 @@ public class Blockchain {
         return unspentTxs;
     }
 
-    public HashMap<String, TxOutputs> findUTXO(){
-        return findUTXO(tip);
-    }
-
+    public HashMap<String, TxOutputs> findUTXO() { return findUTXO(tip); }
     public HashMap<String, TxOutputs> findUTXO(byte[] tip) {
         HashMap<String, TxOutputs> UTXO = new HashMap<>();
         HashMap<String, ArrayList<Integer>> spentTXOs = new HashMap<>();
 
-        Iterator<Block> itr = iterator();
+        Iterator<Block> itr = iterator(tip);
         while(itr.hasNext()){
             Block block = itr.next();
 
@@ -258,10 +212,48 @@ public class Blockchain {
                     }
                 }
             }
-
-            if(block.getPrevBlockHash().length == 0) break;
         }
+
         return UTXO;
+    }
+
+    private boolean validTransaction(Block block){ return validTransaction(block, findUTXO()); }
+    private boolean validTransaction(Block block, HashMap<String, TxOutputs> utxoset) {
+        for (Transaction tx : block.getTransactions()) {
+            if (tx.isCoinBase()) continue;
+
+            if (!verifyTransaction(tx)) return false;
+
+            for (TxInput vin : tx.getVin()) {
+                String txId = Utils.byteArrayToHexString(vin.getTxId());
+                if (!utxoset.containsKey(txId)) return false;
+                if (!utxoset.get(txId).getOutputs().containsKey(vin.getvOut())) return false;
+            }
+        }
+        return true;
+    }
+
+    public Block findBlock(byte[] hash) {
+        Bucket bucket = db.getBucket("blocks");
+        byte[] data = bucket.get(Utils.byteArrayToHexString(hash));
+
+        if (data == null) return null;
+        return Utils.toObject(data);
+    }
+    public Transaction findTransaction(byte[] id) {
+        Bucket bucket = db.getBucket("blocks");
+
+        for (int i = lastHeight; i >= 0; i--) {
+            ArrayList<byte[]> blocks = Utils.toObject(bucket.get("h" + i));
+            for (byte[] blockHash : blocks) {
+                Block block = Utils.toObject(bucket.get(Utils.byteArrayToHexString(blockHash)));
+
+                for (Transaction tx : block.getTransactions())
+                    if(Arrays.equals(tx.getId(), id)) return tx;
+            }
+        }
+
+        return null;
     }
 
     public Transaction newUTXOTransaction(Wallet wallet, String to, int amount, UTXOSet utxoSet) throws Exception{
@@ -298,28 +290,7 @@ public class Blockchain {
         utxoSet.getBc().signTransaction(tx, wallet.getPrivateKey());
         return tx;
     }
-
-    public Block findBlock(byte[] hash) {
-        Bucket bucket = db.getBucket("blocks");
-        byte[] data = bucket.get(Utils.byteArrayToHexString(hash));
-
-        if (data == null) return null;
-        return Utils.toObject(data);
-    }
-    public Transaction findTransaction(byte[] id) {
-        Iterator<Block> itr = iterator();
-        while(itr.hasNext()){
-            Block block = itr.next();
-            for(Transaction tx : block.getTransactions()) {
-                if(Arrays.equals(tx.getId(), id)) return tx;
-                if(block.getPrevBlockHash().length == 0) break;
-            }
-        }
-
-        return null;
-    }
-
-    public void signTransaction(Transaction tx, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, InvalidKeySpecException {
+    public void signTransaction(Transaction tx, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
         HashMap<String, Transaction> prevTxs = new HashMap<>();
 
         for(TxInput vin : tx.getVin()) {
@@ -329,7 +300,6 @@ public class Blockchain {
 
         tx.sign(privateKey, prevTxs);
     }
-
     public boolean verifyTransaction(Transaction tx) {
         if(tx.isCoinBase()) return true;
 
@@ -344,17 +314,10 @@ public class Blockchain {
         return tx.Verify(prevTxs);
     }
 
-    public Db getDb() {
-        return db;
-    }
+    public Db getDb() { return db; }
 
-    public Iterator<Block> iterator() {
-        return new BcItr(db, tip);
-    }
-
-    public Iterator<Block> iterator(byte[] tip) {
-        return new BcItr(db, tip);
-    }
+    public Iterator<Block> iterator() { return iterator(tip); }
+    public Iterator<Block> iterator(byte[] tip) { return new BcItr(db, tip); }
 
     private class BcItr implements Iterator<Block> {
         private byte[] currentHash;
@@ -366,9 +329,7 @@ public class Blockchain {
         }
 
         public boolean hasNext() {
-            byte[] b = db.getBucket("blocks").get(Utils.byteArrayToHexString(currentHash));
-            if( b == null) return false;
-            return true;
+            return db.getBucket("blocks").get(Utils.byteArrayToHexString(currentHash)) != null;
         }
 
         public void remove() {

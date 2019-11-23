@@ -110,13 +110,6 @@ public class UTXOSet {
         return txOutputs.getOutputs().containsKey(txInput.getvOut());
     }
 
-    public boolean validVin(TxInput txInput, HashMap<String, TxOutputs> utxoset) {
-        TxOutputs txOutputs = utxoset.get(Utils.byteArrayToHexString(txInput.getTxId()));
-        if(txOutputs == null){
-            return false;
-        }
-        return txOutputs.getOutputs().containsKey(txInput.getvOut());
-    }
     public Pair<Integer, HashMap<String, ArrayList<Integer>>> findSpendableOutputs(byte[] pubkeyHash, int amount) {
         HashMap<String, ArrayList<Integer>> unspentOutputs = new HashMap<>();
         int accumulated = 0;
