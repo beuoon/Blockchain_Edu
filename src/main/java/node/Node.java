@@ -307,7 +307,6 @@ public class Node extends Thread implements EventHandler<MessageEventArgs> {
 
         if (!mempool.containsKey(id)) {
             mempool.put(id, tx);
-            System.out.println(number + ": " + id);
 
             // 전파
             for (Client client : network.getClients()) {
