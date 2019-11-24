@@ -5,21 +5,20 @@ import DB.Db;
 import blockchain.consensus.ProofOfWork;
 import blockchain.transaction.*;
 import blockchain.wallet.Wallet;
-import node.Mempool;
 import utils.Pair;
 import utils.Utils;
 
 import java.security.*;
-import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Blockchain {
     private Db db;
-   public byte[] tip;
-    int lastHeight;
+    private byte[] tip;
+    private int lastHeight;
 
     private ProofOfWork pow = new ProofOfWork();
-    private Mempool<String, Block> orphanBlocks = new Mempool<>();
+    private ConcurrentHashMap<String, Block> orphanBlocks = new ConcurrentHashMap<>();
     private final Object mutexAddBlock = new Object();
 
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
@@ -122,16 +121,21 @@ public class Blockchain {
         return true;
     }
 
-    public Mempool<String, Block> getOrphanBlock() { return orphanBlocks; }
-    public void addOrphanBlock() {
+    public ConcurrentHashMap<String, Block> getOrphanBlock() { return orphanBlocks; }
+    public ArrayList<byte []> addOrphanBlock() {
         Bucket bucket = db.getBucket("blocks");
+        ArrayList<byte []> hash = new ArrayList<>();
 
         for (Block b : orphanBlocks.values()) {
             if (bucket.get(Utils.byteArrayToHexString(b.getPrevBlockHash())) != null) {
-                if (addBlock(b))
+                if (addBlock(b)) {
                     orphanBlocks.remove(Utils.byteArrayToHexString(b.getHash()));
+                    hash.add(b.getHash());
+                }
             }
         }
+
+        return hash;
     }
 
     public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
@@ -321,6 +325,7 @@ public class Blockchain {
     }
 
     public Db getDb() { return db; }
+    public byte[] getTip() { return tip; }
 
     public Iterator<Block> iterator() { return iterator(tip); }
     public Iterator<Block> iterator(byte[] tip) { return new BcItr(db, tip); }

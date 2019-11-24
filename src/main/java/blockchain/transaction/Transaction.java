@@ -69,7 +69,7 @@ public class Transaction implements Serializable {
 
         for(TxInput vin : Vin) {
             if(prevTxs.get(Utils.byteArrayToHexString(vin.getTxId())) == null)
-                new Exception("ERROR: Rrevious transaction is not correct").printStackTrace();
+                new Exception("ERROR: Previous transaction is not correct").printStackTrace();
         }
 
         Transaction txCopy = trimmedCopy();

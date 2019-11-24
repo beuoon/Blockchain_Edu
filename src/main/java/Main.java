@@ -48,8 +48,8 @@ public class Main {
         for (Node node : nodes)
             node.getNetwork().closeConnection();
 
-        nodes.get(0).getNetwork().connectTo(nodes.get(1).getNodeId(), nodes.get(0).getNodeId());
-        nodes.get(2).getNetwork().connectTo(nodes.get(3).getNodeId(), nodes.get(2).getNodeId());
+        nodes.get(0).connect(nodes.get(1));
+        nodes.get(2).connect(nodes.get(3));
 
         while (true) {
             nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10);
@@ -61,7 +61,7 @@ public class Main {
                 break;
         }
 
-        nodes.get(1).getNetwork().connectTo(nodes.get(2).getNodeId(), nodes.get(1).getNodeId());
+        nodes.get(1).connect(nodes.get(2));
 
         // Test
         while (true) {

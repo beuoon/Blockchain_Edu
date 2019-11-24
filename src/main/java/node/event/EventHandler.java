@@ -1,7 +1,6 @@
 package node.event;
 
-import node.Mempool;
-
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -18,9 +17,9 @@ public final class EventHandler {
      * use below source code. private static List<EventListener> listeners = new
      * ArrayList<EventListener>();
      */
-    private static Mempool<String, EventListener> listeners = new Mempool<>();
+    private static ConcurrentHashMap<String, EventListener> listeners = new ConcurrentHashMap<>();
 
-    private static synchronized Mempool<String,EventListener> getListeners() {
+    private static synchronized ConcurrentHashMap<String,EventListener> getListeners() {
         return listeners;
     }
 
@@ -29,8 +28,8 @@ public final class EventHandler {
             listeners.put(nodeId, eventListener);
     }
 
-    public static synchronized void removeListener(String nodeId, EventListener eventListener) {
-        if (listeners.get(nodeId) == null)
+    public static synchronized void removeListener(String nodeId) {
+        if (listeners.get(nodeId) != null)
             listeners.remove(nodeId);
     }
 
