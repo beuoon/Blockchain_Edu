@@ -146,7 +146,7 @@ public class Node extends Thread implements EventListener {
                 network.sendInv(_nodeId, Network.TYPE.BLOCK, Utils.bytesConcat(blocks.toArray(new byte[][]{})));
         }
 
-        network.closeConnection();
+        network.close();
         EventHandler.removeListener(nodeId);
     }
     public void close() { bLoop = false; }

@@ -16,7 +16,7 @@ public class Main {
         firstNode.createGenesisBlock(firstNode.getWallet().getAddress());
         nodes.add(firstNode);
 
-        final int NODE_NUM = 4;
+        int NODE_NUM = 5;
         for (int i = 1; i < NODE_NUM; i++) {
             Node node = new Node();
             node.createWallet();
@@ -45,12 +45,17 @@ public class Main {
                 break;
         }
 
+        nodes.get(4).close();
+        nodes.remove(--NODE_NUM);
+
         for (Node node : nodes)
             node.getNetwork().closeConnection();
+        ;
 
         nodes.get(0).connect(nodes.get(1));
         nodes.get(2).connect(nodes.get(3));
 
+        from = 0; to = 1;
         while (true) {
             nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10);
             from = to;

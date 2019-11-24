@@ -1,14 +1,10 @@
 package node.network;
 
 import blockchain.Block;
-import blockchain.Blockchain;
 import blockchain.transaction.Transaction;
 import node.event.EventHandler;
-import node.event.EventListener;
 import utils.Utils;
 
-import java.lang.Thread.State;
-import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 
@@ -50,6 +46,10 @@ public class Network {
     }
     public void connectTo(String nodeId) { conns.add(nodeId); }
     public void closeConnection() { conns.clear(); }
+    public void close() {
+        closeConnection();
+        nodes.remove(mNodeId);
+    }
     public ArrayList<String> getConnList() {
         ArrayList<String> connList = new ArrayList<>();
         connList.addAll(conns);
@@ -105,6 +105,7 @@ public class Network {
     }
 
     private void send(String nodeId, byte[] buff) {
-        EventHandler.callEvent(Network.class, mNodeId, nodeId, buff);
+        if (!EventHandler.callEvent(Network.class, mNodeId, nodeId, buff))
+            conns.remove(nodeId);
     }
 }

@@ -9,14 +9,6 @@ public final class EventHandler {
 
     private static final int MAX_THREAD_POOL = 5;
 
-    private static final Logger LOGGER = Logger.getGlobal();
-
-    /**
-     * Note : ArrayList may occur ConcurrentModificationException so using
-     * CopyOnWriteArrayList for prevent Exception based on multi thread. Do not
-     * use below source code. private static List<EventListener> listeners = new
-     * ArrayList<EventListener>();
-     */
     private static ConcurrentHashMap<String, EventListener> listeners = new ConcurrentHashMap<>();
 
     private static synchronized ConcurrentHashMap<String,EventListener> getListeners() {
@@ -24,22 +16,24 @@ public final class EventHandler {
     }
 
     public static synchronized void addListener(String nodeId, EventListener eventListener) {
-        if (listeners.get(nodeId) == null)
+        if (!listeners.containsKey(nodeId))
             listeners.put(nodeId, eventListener);
     }
 
     public static synchronized void removeListener(String nodeId) {
-        if (listeners.get(nodeId) != null)
-            listeners.remove(nodeId);
+        listeners.remove(nodeId);
     }
 
-    public static synchronized void callEvent(final Class<?> caller, String from, String to, byte[] data) {
-        callEvent(caller, from, to, data,true);
+    public static synchronized boolean callEvent(final Class<?> caller, String from, String to, byte[] data) {
+        return callEvent(caller, from, to, data,true);
     }
 
-    public static synchronized void callEvent(final Class<?> caller, String from, String to, byte[] data, boolean doAsynch) {
+    public static synchronized boolean callEvent(final Class<?> caller, String from, String to, byte[] data, boolean doAsynch) {
+        if (!listeners.containsKey(to)) return false;
+
         if (doAsynch)   callEventByAsynch(caller, from, to, data);
         else            callEventBySynch(caller, from, to, data);
+        return true;
     }
 
     private static synchronized void callEventByAsynch(final Class<?> caller, String from, String to, final byte[] data) {
@@ -48,8 +42,7 @@ public final class EventHandler {
         EventListener listener = listeners.get(to);
         executorService.execute(new Runnable() {
             public void run() {
-                if (!listener.getClass().getName().equals(caller.getName()))
-                    listener.onEvent(from, data);
+                listener.onEvent(from, data);
             }
         });
         executorService.shutdown();
@@ -57,7 +50,6 @@ public final class EventHandler {
 
     private static synchronized void callEventBySynch(final Class<?> caller, String from, String to, final byte[] data) {
         EventListener listener = listeners.get(to);
-        if (!listener.getClass().getName().equals(caller.getName()))
-            listener.onEvent(from, data);
+        listener.onEvent(from, data);
     }
 }
