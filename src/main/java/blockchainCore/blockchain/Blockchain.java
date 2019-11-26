@@ -90,13 +90,13 @@ public class Blockchain {
             }
 
             // 블록 추가
+            bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+
             ArrayList<byte[]> blockList = new ArrayList<>();
             if (bucket.get("h" + block.getHeight()) != null)
                 blockList = Utils.toObject(bucket.get("h" + block.getHeight()));
             blockList.add(block.getHash());
             bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
-
-            bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
 
             if (block.getHeight() <= lastHeight) return true;
 
@@ -105,8 +105,6 @@ public class Blockchain {
 
             byte[] prevTip = tip;
             tip = block.getHash();
-            lastHeight = block.getHeight();
-            pow.renewLastHeight(lastHeight);
 
             if (!Arrays.equals(prevTip, block.getPrevBlockHash())) { // 체인 변경
                 UTXOSet utxoSet = new UTXOSet(this);
@@ -116,6 +114,9 @@ public class Blockchain {
                 UTXOSet utxoSet = new UTXOSet(this);
                 utxoSet.update(block);
             }
+
+            lastHeight = block.getHeight();
+            pow.renewLastHeight(lastHeight);
         }
 
         return true;

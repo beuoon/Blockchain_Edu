@@ -1,9 +1,9 @@
 package blockchainCore.DB;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Bucket {
-    private HashMap<String, byte[]> db = new HashMap<>();
+    private ConcurrentHashMap<String, byte[]> db = new ConcurrentHashMap<>();
 
     public void put(String key, byte[] value){
         db.put(key ,value);

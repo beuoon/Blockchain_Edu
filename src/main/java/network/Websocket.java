@@ -1,7 +1,6 @@
 package network;
 
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 
 import blockchainCore.blockchain.Blockchain;
 import org.java_websocket.WebSocket;

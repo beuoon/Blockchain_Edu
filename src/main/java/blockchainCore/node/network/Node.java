@@ -19,7 +19,7 @@ public class Node extends Thread implements EventListener {
 
     private String nodeId;
     private boolean bLoop = true;
-    private boolean bMining = false;
+    private boolean bMining = false, bMineThreadStart = false;
 
     // Wallett
     private Wallets wallets;
@@ -135,18 +135,23 @@ public class Node extends Thread implements EventListener {
     @Override
     public void run() {
         while (bLoop) {
-            try { sleep(1L); } catch (InterruptedException ignored) {}
+            try { sleep(10L); } catch (InterruptedException ignored) {}
 
             fetchInvectory();
 
             if (!bMining) {
                 bMining = true;
+                bMineThreadStart = false;
                 new Thread(new Runnable() {
                     public void run() {
+                        bMineThreadStart = true;
                         mineBlock();
                         bMining = false;
                     }
                 }).start();
+
+                while (!bMineThreadStart)
+                    try { sleep(10L); } catch (InterruptedException ignored) {}
             }
 
             // 고아 블록의 이전 블록 가져오기

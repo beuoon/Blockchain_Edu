@@ -1,10 +1,10 @@
 package blockchainCore.DB;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Db {
 
-   private  HashMap<String, Bucket> bucket = new HashMap();
+    private ConcurrentHashMap<String, Bucket> bucket = new ConcurrentHashMap();
 
     public Bucket getBucket(String bucket) {
         Bucket b = this.bucket.get(bucket);
