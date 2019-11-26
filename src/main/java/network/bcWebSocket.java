@@ -1,6 +1,7 @@
 package network;
 
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 
 import blockchainCore.BlockchainCore;
 import blockchainCore.blockchain.Blockchain;
@@ -34,24 +35,42 @@ public class bcWebSocket extends WebSocketServer {
     public void onMessage(WebSocket webSocket, String s) {
         Gson gson = new Gson();
 
+        HashMap<String, Object> msg = new HashMap<>();
+        msg = gson.fromJson(s, msg.getClass());
+
+        String type = (String)msg.get("type");
+        Object data = msg.get("data");
+
+        switch (type) {
+            case "Node.C":          webSocketHandler.createNode();              break;
+            case "Node.D":          webSocketHandler.destoryNode(data);         break;
+            case "Wallet.C":        webSocketHandler.createWallet(data);        break;
+            case "Connection.C":    webSocketHandler.createConnection(data);    break;
+            case "Connection.D":    webSocketHandler.destroyConnection(data);   break;
+            case "Transmission.E":  webSocketHandler.endTransmission(data);     break;
+            case "Send":            webSocketHandler.sendBTC(data);             break;
+        }
+
+
         System.out.println("received message from "    + webSocket.getRemoteSocketAddress() + ": " + s);
-        String node1 = webSocketHandler.bcCore.createNode();
-        String node2 = webSocketHandler.bcCore.createNode();
 
-        Node n1 = webSocketHandler.bcCore.getNode(node1);
-        n1.createWallet();
-        n1.createGenesisBlock(n1.getWallet().getAddress());
+//        String node1 = webSocketHandler.bcCore.createNode();
+//        String node2 = webSocketHandler.bcCore.createNode();
+//
+//        Node n1 = webSocketHandler.bcCore.getNode(node1);
+//        n1.createWallet();
+//        n1.createGenesisBlock(n1.getWallet().getAddress());
+//
+//        Node n2 = webSocketHandler.bcCore.getNode(node2);
+//        n2.createWallet();
+//        n2.createNullBlockchain();
+//        n2.setGenesisBlock(n1.getGenesisBlock());
+//
+//        n1.getNetwork().autoConnect(1);
+//
+//        n1.send(n2.getWallet().getAddress(), 1);
 
-        Node n2 = webSocketHandler.bcCore.getNode(node2);
-        n2.createWallet();
-        n2.createNullBlockchain();
-        n2.setGenesisBlock(n1.getGenesisBlock());
-
-        n1.getNetwork().autoConnect(1);
-
-        n1.send(n2.getWallet().getAddress(), 1);
-
-        webSocket.send(gson.toJson(webSocketHandler.nodeInf(n1.getNodeId())));
+//        webSocket.send(gson.toJson(webSocketHandler.nodeInf(n1.getNodeId())));
     }
 
 

@@ -45,6 +45,7 @@ public class Network {
         }
     }
     public void connectTo(String nodeId) { conns.add(nodeId); }
+    public void disconnectionTo(String nodeId) { conns.remove(nodeId); }
     public void closeConnection() { conns.clear(); }
     public void close() {
         closeConnection();

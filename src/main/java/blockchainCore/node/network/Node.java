@@ -36,13 +36,14 @@ public class Node extends Thread implements EventListener {
     private ConcurrentHashMap<String, Transaction> txPool = new ConcurrentHashMap<>();
     private ConcurrentSkipListSet<String> invBlock = new ConcurrentSkipListSet<>(), invTx = new ConcurrentSkipListSet<>();
 
-    private ConcurrentHashMap<String, String> receivedBlocks = new ConcurrentHashMap<>();
+    private ConcurrentSkipListSet<String> receivedBlocks = new ConcurrentSkipListSet<>();
 
     // Network
     private Network network;
 
     public Node() {
         wallets = new Wallets();
+        useWallet(createWallet());
         this.db = new Db();
         //nodeId = Utils.sha256(Float.valueOf(new SecureRandom().nextFloat()).toString().getBytes());
         nodeId = String.format("blockchainCore.node %d", NodeCount++);
@@ -52,22 +53,13 @@ public class Node extends Thread implements EventListener {
     }
 
     // Wallet
-    public void createWallet() {
+    public String createWallet() {
         String address = wallets.createWallet();
-        wallet = wallets.getWallet(address);
         System.out.printf("wallet '%s' id created\n", address);
+        return address;
     }
-
-    public Wallet getWallet() {
-        return wallet;
-    }
-
-    public void useWallet(String address) {
-        wallet = wallets.getWallet(address);
-    }
-
+    public void useWallet(String address) { wallet = wallets.getWallet(address); }
     public ArrayList<String> getAddresses() { return wallets.getAddresses(); }
-
     public ArrayList<Wallet> getWallets() {
         ArrayList<Wallet> _wallets = new ArrayList<>();
         for(String address : getAddresses()) {
@@ -85,19 +77,6 @@ public class Node extends Thread implements EventListener {
         this.bc = new Blockchain(this.db);
     }
 
-    public Block getGenesisBlock() {
-        Iterator<Block> itr = bc.iterator();
-        Block block = null;
-        while(itr.hasNext()) block = itr.next();
-        return block;
-    }
-
-    public void setGenesisBlock(Block block) {
-        bc.addBlock(block);
-        UTXOSet utxoSet = new UTXOSet(bc);
-        utxoSet.reIndex();
-    }
-
     public String getNodeId() {
         return nodeId;
     }
@@ -105,24 +84,27 @@ public class Node extends Thread implements EventListener {
     public Network getNetwork() {
         return network;
     }
-    public void connect(Node to) {
-        network.connectTo(to.nodeId);
-        network.sendAddress(to.nodeId);
-        network.sendVersion(to.nodeId, bc.getTip());
+    public void connect(String to) {
+        network.connectTo(to);
+        network.sendAddress(to);
+        network.sendVersion(to, bc.getTip());
+    }
+    public void disconnection(String _nodeId) {
+        network.disconnectionTo(_nodeId);
     }
 
     // TEST
-    public boolean send(String to, int amount) {
+    public boolean send(String from, String to, int amount) {
         UTXOSet utxoSet = new UTXOSet(bc);
         Transaction tx;
         try {
-            tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
+            tx = bc.newUTXOTransaction(wallets.getWallet(from), to, amount, utxoSet);
         } catch (Exception e) {
             System.out.println(nodeId + ": " + e);
             return false;
         }
 
-        System.out.printf("'%s'가 '%s'에게 %d 전송\n", wallet.getAddress(), to, amount);
+        System.out.printf("'%s'가 '%s'에게 %d 전송\n", from, to, amount);
         txPool.put(Utils.byteArrayToHexString(tx.getId()), tx);
         for (String _nodeId : network.getConnList())
             network.sendTx(_nodeId, tx);
@@ -266,8 +248,9 @@ public class Node extends Thread implements EventListener {
 
         invBlock.remove(blockHash);
 
-        receivedBlocks.put(blockHash, from);
-        while (receivedBlocks.containsKey(blockHash))
+        String blockKey = nodeId + blockHash;
+        receivedBlocks.add(blockHash);
+        while (receivedBlocks.contains(blockHash))
             try { sleep(50L); } catch (InterruptedException ignored) {}
 
         if (!bc.addBlock(block)) return;
@@ -399,7 +382,9 @@ public class Node extends Thread implements EventListener {
         ArrayList<Transaction> txs = new ArrayList<>(col);
         return txs;
     }
-    public ConcurrentHashMap<String, String> getReceivedBlocks() { return receivedBlocks; }
+    public void endTransmission(String blockHash) {
+        receivedBlocks.remove(blockHash);
+    }
 
     @Override
     public void onEvent(String from, byte[] data) {

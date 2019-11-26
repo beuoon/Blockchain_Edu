@@ -22,6 +22,50 @@ public class WebSocketHandler {
     public BlockchainCore bcCore = new BlockchainCore();
     Gson gson = new Gson();
 
+    public void createNode() {
+        bcCore.createNode();
+    }
+    public void destoryNode(Object data) {
+        String nodeId = (String)data;
+
+        bcCore.destoryNode(nodeId);
+    }
+    public void createWallet(Object data) {
+        String nodeId = (String)data;
+
+        bcCore.createWallet(nodeId);
+    }
+    public void createConnection(Object data) {
+        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
+        String source = (String)dataMap.get("source");
+        String destination = (String)dataMap.get("destination");
+
+        bcCore.createConnection(source, destination);
+    }
+    public void destroyConnection(Object data) {
+        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
+        String source = (String)dataMap.get("source");
+        String destination = (String)dataMap.get("destination");
+
+        bcCore.destroyConnection(source, destination);
+    }
+    public void endTransmission(Object data) {
+        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
+        String nodeId = (String)dataMap.get("nodeId");
+        String BlockHash = (String)dataMap.get("block");
+
+        bcCore.endTransmission(nodeId, BlockHash);
+    }
+    public void sendBTC(Object data) {
+        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
+        String nodeId = (String)dataMap.get("nodeId");
+        String from = (String)dataMap.get("from");
+        String to = (String)dataMap.get("to");
+        int amount = (Integer)dataMap.get("amount");
+
+        bcCore.sendBTC(nodeId, from, to, amount);
+    }
+
     public HashMap<String, Object> nodeInf(String nodeId) {
         Node node = bcCore.getNode(nodeId);
         HashMap<String, Object> nodeInf = new HashMap<>();
