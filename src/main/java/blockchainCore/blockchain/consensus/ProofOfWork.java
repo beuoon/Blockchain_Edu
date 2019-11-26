@@ -15,14 +15,7 @@ public class ProofOfWork {
     }
 
     public static void Mine(Block block) {
-        int nonce = new Random().nextInt();
-
-        byte[] data = prepareData(block, nonce);
-        byte[] hash = Utils.sha256(data);
-        System.out.print(Utils.toHexString(hash)+"\n");
-
-        block.setHash(hash);
-        block.setNonce(nonce);
+        // implements me
     }
 
     public static boolean Validate(Block block){
