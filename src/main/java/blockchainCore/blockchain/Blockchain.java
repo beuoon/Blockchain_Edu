@@ -330,6 +330,7 @@ public class Blockchain {
     }
 
     public Db getDb() { return db; }
+    public int getLastHeight() { return lastHeight; }
     public byte[] getTip() { return tip; }
     public ArrayList<Block> getBlocks() {
         Bucket b = db.getBucket("blocks");

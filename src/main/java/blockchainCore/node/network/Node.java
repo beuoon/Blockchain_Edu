@@ -2,7 +2,6 @@ package blockchainCore.node.network;
 
 import blockchainCore.DB.Db;
 import blockchainCore.blockchain.*;
-import blockchainCore.blockchain.event.BlockSignalHandler;
 import blockchainCore.blockchain.transaction.*;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.blockchain.wallet.Wallets;
@@ -37,8 +36,6 @@ public class Node extends Thread implements NetworkListener {
 
     private ConcurrentHashMap<String, Transaction> txPool = new ConcurrentHashMap<>();
     private ConcurrentSkipListSet<String> invBlock = new ConcurrentSkipListSet<>(), invTx = new ConcurrentSkipListSet<>();
-
-    private ConcurrentSkipListSet<String> receivedBlocks = new ConcurrentSkipListSet<>();
 
     // Network
     private Network network;
@@ -218,8 +215,6 @@ public class Node extends Thread implements NetworkListener {
 
         System.out.println(nodeId + "이 " + Utils.toHexString(newBlock.getHash()) + " 블록을 채굴!!");
 
-        BlockSignalHandler.callEvent(nodeId, nodeId, newBlock);
-
         // 블록내 트랜잭션 TxPool 에서 제거
         for (Transaction tx : newBlock.getTransactions())
             txPool.remove(Utils.toHexString(tx.getId()));
@@ -262,19 +257,10 @@ public class Node extends Thread implements NetworkListener {
         Block block = Utils.toObject(data);
         String blockHash = Utils.toHexString(block.getHash());
 
-        BlockSignalHandler.callEvent(from, nodeId, block);
-
         invBlock.remove(blockHash);
-
-        String blockKey = nodeId + blockHash;
-        receivedBlocks.add(blockHash);
-        while (receivedBlocks.contains(blockHash))
-            try { sleep(50L); } catch (InterruptedException ignored) {}
 
         if (!bc.addBlock(block)) return;
         System.out.println(nodeId + "에 " + blockHash + " 블록이 추가 되었습니다.");
-
-        BlockSignalHandler.callEvent(nodeId, nodeId, block);
 
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())
@@ -401,9 +387,6 @@ public class Node extends Thread implements NetworkListener {
         Collection col = txPool.values();
         ArrayList<Transaction> txs = new ArrayList<>(col);
         return txs;
-    }
-    public void endTransmission(String blockHash) {
-        receivedBlocks.remove(blockHash);
     }
 
     @Override
