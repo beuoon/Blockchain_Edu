@@ -15,28 +15,7 @@ public class ProofOfWork {
     }
 
     public boolean mine(Block block) {
-        //System.out.println("Mining the block containg," + block.getData());
-        byte[] hash = new byte[0];
-        int nonce = 0;
-
-        while(nonce < Integer.MAX_VALUE) {
-            // 새로운 블록이 오거나 최장길이 갱신시.
-            if (block.getHeight() <= lastHeight) return false;
-
-            byte[] data = prepareData(block, nonce);
-            hash = Utils.sha256(data);
-            // System.out.printf("\r%s", Utils.toHexString(hash));
-
-            BigInteger bihash = new BigInteger(1, hash);
-            if( bihash.compareTo(target) == -1 ) break;
-            else nonce++;
-        }
-        lastHeight = block.getHeight();
-
-        block.setHash(hash);
-        block.setNonce(nonce);
-        // System.out.println();System.out.println();
-        return true;
+        // implements me
     }
 
     public void renewLastHeight(int height) { lastHeight = height; }
