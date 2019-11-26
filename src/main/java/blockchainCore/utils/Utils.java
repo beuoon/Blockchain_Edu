@@ -19,14 +19,6 @@ public class Utils {
         return md.digest();
     }
 
-    public static byte[] ripemd160(byte[] msg) {
-        RIPEMD160Digest d = new RIPEMD160Digest();
-        d.update(msg, 0, msg.length);
-        byte[] o = new byte[d.getDigestSize()];
-        d.doFinal(o, 0);
-        return o;
-    }
-
     public static byte[] bytesConcat(byte[]... bytes) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -81,30 +73,5 @@ public class Utils {
         }
 
         return bytes;
-    }
-
-    public static <T> T toObject(byte[] b) {
-        T obj = null;
-
-        ByteArrayInputStream bis =null;
-        ObjectInput ois = null;
-
-        try {
-            bis = new ByteArrayInputStream(b);
-            ois = new ObjectInputStream(bis);
-            obj = (T)ois.readObject();
-        } catch(Exception e) {
-            e.printStackTrace();
-        } finally {
-            try { if (bis != null) bis.close(); } catch (IOException ignored) {}
-            try { if (ois != null) ois.close(); } catch (IOException ignored) {}
-        }
-
-        return obj;
-    }
-
-    public static byte[] hashPubKey(byte[] pubkey) {
-        return new byte[]{};
-
     }
 }

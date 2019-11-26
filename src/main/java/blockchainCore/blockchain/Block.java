@@ -27,51 +27,12 @@ public class Block implements Serializable{
         this.height = height;
     }
 
-    //bytes to block
-    public Block(byte[] b) {
-        Block block = Utils.toObject(b);
-
-        this.timestamp = block.timestamp;
-        this.transactions = block.transactions;
-        this.prevBlockHash = block.prevBlockHash;
-        this.hash = block.hash;
-        this.nonce = block.nonce;
-        this.height = block.height;
-    }
-
     public byte[] getBytesExceptHash() {
         return Utils.bytesConcat(String.valueOf(timestamp).getBytes(), Utils.sha256(Utils.toBytes(transactions)), prevBlockHash);
     }
 
-    public byte[] getPrevBlockHash() {
-        return prevBlockHash;
-    }
-
-    public byte[] getHash() {
-        return hash;
-    }
-
-    public int getNonce() {
-        return nonce;
-    }
-
-    public void setHash(byte[] hash) {
-        this.hash = hash;
-    }
-
-    public void setNonce(int nonce) {
-        this.nonce = nonce;
-    }
-
-    public int getHeight() {
-        return height;
-    }
-
-    public Transaction[] getTransactions() {
-        return transactions;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
+    public byte[] getHash() { return hash; }
+    public int getNonce() { return nonce; }
+    public void setHash(byte[] hash) { this.hash = hash; }
+    public void setNonce(int nonce) { this.nonce = nonce; }
 }

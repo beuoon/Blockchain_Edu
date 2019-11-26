@@ -8,17 +8,29 @@ import java.math.BigInteger;
 public class ProofOfWork {
     static final int targetBits = 18;
     static final BigInteger target = new BigInteger("1").shiftLeft(256-targetBits);
-    private int lastHeight = -1;
 
     private static byte[] prepareData(Block block, int nonce) {
         return Utils.bytesConcat(block.getBytesExceptHash(), Integer.toString(targetBits).getBytes(), Integer.toString(nonce).getBytes());
     }
 
-    public boolean mine(Block block) {
-        // implements me
-    }
+    public static void Mine(Block block) {
+        byte[] hash = new byte[0];
+        int nonce = 0;
 
-    public void renewLastHeight(int height) { lastHeight = height; }
+        while(nonce < Integer.MAX_VALUE) {
+            byte[] data = prepareData(block, nonce);
+            hash = Utils.sha256(data);
+            System.out.print("\r" + Utils.toHexString(hash));
+
+            BigInteger bihash = new BigInteger(1, hash);
+            if( bihash.compareTo(target) == -1 ) break;
+            else nonce++;
+        }
+        System.out.print("\n");
+
+        block.setHash(hash);
+        block.setNonce(nonce);
+    }
 
     public static boolean Validate(Block block){
         BigInteger bihash = new BigInteger(1, block.getHash());
