@@ -2,19 +2,20 @@ package network;
 
 import java.net.InetSocketAddress;
 
+import blockchainCore.BlockchainCore;
 import blockchainCore.blockchain.Blockchain;
+import blockchainCore.node.network.Node;
+import com.google.gson.Gson;
+import network.resources.handler.WebSocketHandler;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-public class Websocket extends WebSocketServer {
+public class bcWebSocket extends WebSocketServer {
+    WebSocketHandler webSocketHandler = new WebSocketHandler();
 
-    Blockchain bc = null;
-
-    public Websocket(InetSocketAddress address) {
+    public bcWebSocket(InetSocketAddress address) {
         super(address);
-
-
     }
 
     @Override
@@ -31,9 +32,28 @@ public class Websocket extends WebSocketServer {
 
     @Override
     public void onMessage(WebSocket webSocket, String s) {
+        Gson gson = new Gson();
+
         System.out.println("received message from "    + webSocket.getRemoteSocketAddress() + ": " + s);
-        webSocket.send(s);
+        String node1 = webSocketHandler.bcCore.createNode();
+        String node2 = webSocketHandler.bcCore.createNode();
+
+        Node n1 = webSocketHandler.bcCore.getNode(node1);
+        n1.createWallet();
+        n1.createGenesisBlock(n1.getWallet().getAddress());
+
+        Node n2 = webSocketHandler.bcCore.getNode(node2);
+        n2.createWallet();
+        n2.createNullBlockchain();
+        n2.setGenesisBlock(n1.getGenesisBlock());
+
+        n1.getNetwork().autoConnect(1);
+
+        n1.send(n2.getWallet().getAddress(), 1);
+
+        webSocket.send(gson.toJson(webSocketHandler.nodeInf(n1.getNodeId())));
     }
+
 
     @Override
     public void onError(WebSocket webSocket, Exception e) {
