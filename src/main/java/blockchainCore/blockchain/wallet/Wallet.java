@@ -15,37 +15,19 @@ public class Wallet {
 
     public Wallet() {
         // implement me
-        try {
-            ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256k1");
-
-            KeyPairGenerator g = KeyPairGenerator.getInstance("EC");
-            g.initialize(ecSpec, new SecureRandom());
-            KeyPair keyPair = g.generateKeyPair();
-
-            publicKey = keyPair.getPublic();
-            privateKey = keyPair.getPrivate();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
+
 
     public String getAddress() {
-        byte[] pubkeyHash = Utils.ripemd160(Utils.sha256(publicKey.getEncoded()));
-        byte[] versionedPayload = Utils.bytesConcat(version, pubkeyHash);
-        byte[] checksum = checksum(versionedPayload);
-
-        byte[] fullPayload = Utils.bytesConcat(versionedPayload, checksum);
-        String address = Base58.encode(fullPayload);
-
-        return address;
+        return getAddress(publicKey.getEncoded());
     }
 
-    private byte[] checksum(byte[] payload) {
-        byte[] firstSha256 = Utils.sha256(payload);
-        byte[] secondSha256 = Utils.sha256(firstSha256);
-        return Arrays.copyOfRange(secondSha256,0, addressChecksumLen);
+    public String getAddress(byte[] publicKey) {
+        //implement me
+        String s = "implement me";
+        return s;
     }
+
 
     public PrivateKey getPrivateKey() {
         return privateKey;

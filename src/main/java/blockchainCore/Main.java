@@ -1,52 +1,35 @@
 package blockchainCore;
 
+import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.node.network.Node;
+import blockchainCore.utils.Utils;
 
 import java.util.ArrayList;
 
 public class Main {
-    public static void main(String[] args) {
-        final int NODE_NUM = 10, TX_NUM = 50;
+    public static void main(String[] args) throws Exception {
+        /*
+            Wallet Challenge!!
+            블록체인 지갑을 만들어 보아요!
 
-        // 노드 생성
-        ArrayList<Node> nodes = new ArrayList<>();
+            blockchainCore.blockchain.wallet.Wallet.java 파일을 수정하여 올바른 지갑을 만들 수 있도록 도와주세요!
+            Hint! : ECGenParameterSpec 함수를 사용할 수 있습니다!
+         */
 
-        Node newNode = new Node(); newNode.createGenesisBlock(); nodes.add(newNode);
-        for (int i = 1; i < NODE_NUM; i++) {
-            newNode = new Node();
-            newNode.createNullBlockchain();
-            nodes.add(newNode);
-        }
-
-        // 노드 연결
-        for (Node node : nodes) node.getNetwork().autoConnect(NODE_NUM / 3 * 2);
-
-        // 스레드 시작
-        for (Node node : nodes) node.start();
-
-        // 거래
-        int from = 0, to = 1;
-        for (int i = 0; i < TX_NUM; i++) {
-            String fromAddress = nodes.get(from).getAddresses().get(0);
-            String toAddress = nodes.get(to).getAddresses().get(0);
-
-            nodes.get(from).send(fromAddress, toAddress, 20);
-
-            Wait:
-            while (true) {
-                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
-                for (Node node : nodes)
-                    if (node.getBlockChain().getLastHeight() <= i) continue Wait;
-                break;
+        Results results = new Results();
+        Wallet wallet = new Wallet();
+        for(int i=0; i<results.pubkeys.length; i++){
+            if(!wallet.getAddress(Utils.hexToBytes(results.pubkeys[i])).equals(results.result[i])) {
+                throw new Exception("YOUR CODE IS NOT VALID!!");
             }
-
-            from = to;
-            to = (to + 1) % NODE_NUM;
         }
 
-        // 문제
+        for(int i=0; i<100; i++) {
+            if(!results.validate(wallet.getAddress(Utils.hexToBytes(results.pubkeys[0])))) {
+                throw new Exception("YOUR CODE IS NOT VALID!!");
+            }
+        }
 
-        // 종료
-        for (Node node : nodes) node.close();
+        System.out.println("CONGRATURATION!!! YOU SOLVED IT!!");
     }
 }
