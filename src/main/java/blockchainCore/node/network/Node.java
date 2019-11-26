@@ -36,6 +36,8 @@ public class Node extends Thread implements EventListener {
     private ConcurrentHashMap<String, Transaction> txPool = new ConcurrentHashMap<>();
     private ConcurrentSkipListSet<String> invBlock = new ConcurrentSkipListSet<>(), invTx = new ConcurrentSkipListSet<>();
 
+    private ConcurrentHashMap<String, String> receivedBlocks = new ConcurrentHashMap<>();
+
     // Network
     private Network network;
 
@@ -260,11 +262,16 @@ public class Node extends Thread implements EventListener {
     }
     private void handleBlock(String from, byte[] data) {
         Block block = Utils.toObject(data);
+        String blockHash = Utils.byteArrayToHexString(block.getHash());
 
-        invBlock.remove(Utils.byteArrayToHexString(block.getHash()));
+        invBlock.remove(blockHash);
+
+        receivedBlocks.put(blockHash, from);
+        while (receivedBlocks.containsKey(blockHash))
+            try { sleep(50L); } catch (InterruptedException ignored) {}
 
         if (!bc.addBlock(block)) return;
-        System.out.println(nodeId + "에 " + Utils.byteArrayToHexString(block.getHash()) + " 블록이 추가 되었습니다.");
+        System.out.println(nodeId + "에 " + blockHash + " 블록이 추가 되었습니다.");
 
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())
@@ -392,6 +399,7 @@ public class Node extends Thread implements EventListener {
         ArrayList<Transaction> txs = new ArrayList<>(col);
         return txs;
     }
+    public ConcurrentHashMap<String, String> getReceivedBlocks() { return receivedBlocks; }
 
     @Override
     public void onEvent(String from, byte[] data) {
