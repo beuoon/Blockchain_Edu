@@ -41,7 +41,7 @@ public class Utils {
         return outputStream.toByteArray();
     }
 
-    public static String byteArrayToHexString(byte[] bytes) {
+    public static String toHexString(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
 
         for (byte b : bytes) {
@@ -51,7 +51,7 @@ public class Utils {
         return sb.toString();
     }
 
-    public static byte[] hexStringToByteArray(String s) {
+    public static byte[] hexToBytes(String s) {
         int len = s.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {

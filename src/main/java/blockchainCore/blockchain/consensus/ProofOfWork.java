@@ -25,7 +25,7 @@ public class ProofOfWork {
 
             byte[] data = prepareData(block, nonce);
             hash = Utils.sha256(data);
-            // System.out.printf("\r%s", Utils.byteArrayToHexString(hash));
+            // System.out.printf("\r%s", Utils.toHexString(hash));
 
             BigInteger bihash = new BigInteger(1, hash);
             if( bihash.compareTo(target) == -1 ) break;

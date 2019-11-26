@@ -15,8 +15,7 @@ public final class BlockSignalHandler {
     private static BlockSignalListener listener;
 
     public static synchronized void setListener(BlockSignalListener eventListener) {
-        if (listener != null)
-            listener=eventListener;
+        listener=eventListener;
     }
 
     public static synchronized void removeListener() {

@@ -9,6 +9,7 @@ import blockchainCore.blockchain.wallet.Wallets;
 import blockchainCore.node.network.event.NetworkHandler;
 import blockchainCore.node.network.event.NetworkListener;
 import blockchainCore.utils.Utils;
+import org.bitcoinj.core.Base58;
 
 import java.time.LocalTime;
 import java.util.*;
@@ -103,15 +104,30 @@ public class Node extends Thread implements NetworkListener {
         }
 
         System.out.printf("'%s'가 '%s'에게 %d 전송\n", from, to, amount);
-        txPool.put(Utils.byteArrayToHexString(tx.getId()), tx);
+        txPool.put(Utils.toHexString(tx.getId()), tx);
         for (String _nodeId : network.getConnList())
             network.sendTx(_nodeId, tx);
         return true;
     }
 
-    public void checkBalance() {
-        if(wallet == null) return;
-        Functions.getBalance(wallet.getAddress(), bc);
+    public HashMap<String, Integer> getBalances() {
+        HashMap<String, Integer> balances = new HashMap<>();
+        UTXOSet utxoSet = new UTXOSet(bc);
+
+        for (String address : wallets.getAddresses()) {
+            byte[] pubkeyHash = Base58.decode(address);
+            pubkeyHash = Arrays.copyOfRange(pubkeyHash, 1, pubkeyHash.length - 4);
+            ArrayList<TxOutput> UTOXs = utxoSet.findUTXO(pubkeyHash);
+
+            int balance = 0;
+            for (TxOutput out : UTOXs) {
+                balance += out.getValue();
+            }
+
+            balances.put(address, balance);
+        }
+
+        return balances;
     }
 
     @Override
@@ -139,7 +155,7 @@ public class Node extends Thread implements NetworkListener {
             // 고아 블록의 이전 블록 가져오기
             ConcurrentHashMap<String, Block> orphanBlocks = bc.getOrphanBlock();
             for (Block block : orphanBlocks.values()) {
-                String prevBlock = Utils.byteArrayToHexString(block.getPrevBlockHash());
+                String prevBlock = Utils.toHexString(block.getPrevBlockHash());
                 if (!orphanBlocks.containsKey(prevBlock))
                     invBlock.add(prevBlock);
             }
@@ -163,7 +179,7 @@ public class Node extends Thread implements NetworkListener {
         ArrayList<TxInput> usedVin = new ArrayList<>();
 
         for (Transaction tx : txPool.values()) {
-            String key = Utils.byteArrayToHexString(tx.getId());
+            String key = Utils.toHexString(tx.getId());
 
             // Tx 서명 검증
             if (!bc.verifyTransaction(tx)) {
@@ -200,13 +216,13 @@ public class Node extends Thread implements NetworkListener {
 
         nextMineTime = LocalTime.now().plusSeconds(BLOCK_MINE_INTERVAL);
 
-        System.out.println(nodeId + "이 " + Utils.byteArrayToHexString(newBlock.getHash()) + " 블록을 채굴!!");
+        System.out.println(nodeId + "이 " + Utils.toHexString(newBlock.getHash()) + " 블록을 채굴!!");
+
+        BlockSignalHandler.callEvent(nodeId, nodeId, newBlock);
 
         // 블록내 트랜잭션 TxPool 에서 제거
         for (Transaction tx : newBlock.getTransactions())
-            txPool.remove(Utils.byteArrayToHexString(tx.getId()));
-
-        BlockSignalHandler.callEvent(nodeId, nodeId, newBlock);
+            txPool.remove(Utils.toHexString(tx.getId()));
 
         // 블록 전파
         for (String _nodeId : network.getConnList())
@@ -223,7 +239,7 @@ public class Node extends Thread implements NetworkListener {
                 String hash = blockIter.next();
 
                 String nodeId = clients.get(random.nextInt(clients.size()));
-                network.sendGetData(nodeId, Network.TYPE.BLOCK, Utils.hexStringToByteArray(hash));
+                network.sendGetData(nodeId, Network.TYPE.BLOCK, Utils.hexToBytes(hash));
             }
         }
 
@@ -233,7 +249,7 @@ public class Node extends Thread implements NetworkListener {
                 String hash = txIter.next();
 
                 String nodeId = clients.get(random.nextInt(clients.size()));
-                network.sendGetData(nodeId, Network.TYPE.TX, Utils.hexStringToByteArray(hash));
+                network.sendGetData(nodeId, Network.TYPE.TX, Utils.hexToBytes(hash));
             }
         }
     }
@@ -244,7 +260,7 @@ public class Node extends Thread implements NetworkListener {
     }
     private void handleBlock(String from, byte[] data) {
         Block block = Utils.toObject(data);
-        String blockHash = Utils.byteArrayToHexString(block.getHash());
+        String blockHash = Utils.toHexString(block.getHash());
 
         BlockSignalHandler.callEvent(from, nodeId, block);
 
@@ -258,9 +274,11 @@ public class Node extends Thread implements NetworkListener {
         if (!bc.addBlock(block)) return;
         System.out.println(nodeId + "에 " + blockHash + " 블록이 추가 되었습니다.");
 
+        BlockSignalHandler.callEvent(nodeId, nodeId, block);
+
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())
-            txPool.remove(Utils.byteArrayToHexString(tx.getId()));
+            txPool.remove(Utils.toHexString(tx.getId()));
 
         // 전파
         for (String _nodeId : network.getConnList()) {
@@ -277,7 +295,7 @@ public class Node extends Thread implements NetworkListener {
                 for (int i = 0; i < items.length; i += 32) {
                     byte[] item = Arrays.copyOfRange(items, i, i+32);
 
-                    String hash = Utils.byteArrayToHexString(item);
+                    String hash = Utils.toHexString(item);
 
                     if (!invBlock.contains(hash) && bc.findBlock(item) == null)
                         invBlock.add(hash);
@@ -288,7 +306,7 @@ public class Node extends Thread implements NetworkListener {
                 for (int i = 0; i < items.length; i += 32) {
                     byte[] item = Arrays.copyOfRange(items, i, i+32);
 
-                    String hash = Utils.byteArrayToHexString(item);
+                    String hash = Utils.toHexString(item);
 
                     if (!invTx.contains(hash) && !txPool.containsKey(hash) && bc.findTransaction(item) == null) {
                         invTx.add(hash);
@@ -322,10 +340,10 @@ public class Node extends Thread implements NetworkListener {
                 if (block != null)
                     network.sendBlock(from, block);
                 else
-                    invBlock.add(Utils.byteArrayToHexString(hash));
+                    invBlock.add(Utils.toHexString(hash));
                 break;
             case Network.TYPE.TX:
-                String id = Utils.byteArrayToHexString(hash);
+                String id = Utils.toHexString(hash);
                 Transaction tx = null;
 
                 if (txPool.containsKey(id))
@@ -336,12 +354,12 @@ public class Node extends Thread implements NetworkListener {
                 if (tx != null)
                     network.sendTx(from, tx);
                 else
-                    invTx.add(Utils.byteArrayToHexString(hash));
+                    invTx.add(Utils.toHexString(hash));
         }
     }
     private void handleTx(String from, byte[] data) {
         Transaction tx = Utils.toObject(data);
-        String id = Utils.byteArrayToHexString(tx.getId());
+        String id = Utils.toHexString(tx.getId());
 
         invTx.remove(id);
 

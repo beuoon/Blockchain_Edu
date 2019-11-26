@@ -3,20 +3,16 @@ package network;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import blockchainCore.BlockchainCore;
 import blockchainCore.blockchain.Block;
-import blockchainCore.blockchain.Blockchain;
 import blockchainCore.blockchain.event.BlockSignalHandler;
 import blockchainCore.blockchain.event.BlockSignalListener;
 import blockchainCore.blockchain.wallet.Wallet;
-import blockchainCore.node.network.Node;
 import blockchainCore.utils.Utils;
 import com.google.gson.Gson;
-import network.resources.handler.WebSocketHandler;
+import network.handler.WebSocketHandler;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
@@ -24,7 +20,7 @@ import org.java_websocket.server.WebSocketServer;
 public class bcWebSocket extends WebSocketServer implements BlockSignalListener {
     private WebSocketHandler webSocketHandler = new WebSocketHandler();
 
-    private ConcurrentSkipListSet<WebSocket> sockets = new ConcurrentSkipListSet<>();
+    private ArrayList<WebSocket> sockets = new ArrayList<>();
 
     public bcWebSocket(InetSocketAddress address) {
         super(address);
@@ -59,27 +55,32 @@ public class bcWebSocket extends WebSocketServer implements BlockSignalListener 
         Object data = msg.get("data");
 
         switch (type) {
-            case "Node.C":
+            case "Node.C": {
                 String nodeId = webSocketHandler.createNode();
                 obj = webSocketHandler.nodeInf(nodeId);
 
                 sendObject.put("type", "Node.I");
                 sendObject.put("data", obj);
                 break;
+            }
             case "Node.D":
                 webSocketHandler.destoryNode(data);
                 break;
-            case "Wallet.C":
+            case "Wallet.C": {
                 Wallet wallet = webSocketHandler.createWallet(data);
                 obj = webSocketHandler.walletInf(wallet);
+
+                String nodeId = (String)((Map<String, Object>) data).get("nodeId");
+                ((Map<String, Object>) obj).put("nodeId", nodeId);
 
                 sendObject.put("type", "Wallet.I");
                 sendObject.put("data", obj);
                 break;
+            }
             case "Connection.C":    webSocketHandler.createConnection(data);    break;
             case "Connection.D":    webSocketHandler.destroyConnection(data);   break;
             case "Transmission.E":  webSocketHandler.endTransmission(data);     break;
-            case "Send":            webSocketHandler.sendBTC(data);             break;
+            case "Node.S":           webSocketHandler.sendBTC(data);             break;
         }
 
         if (!sendObject.isEmpty())
@@ -124,20 +125,34 @@ public class bcWebSocket extends WebSocketServer implements BlockSignalListener 
         Map<String, Object> sendObject = new HashMap<>();
 
         if (from.equals(to)) {
-            Object obj = webSocketHandler.blockInf(block);
-            sendObject.put("type", "Block.T");
+            // Block
+            Map<String, Object> obj = webSocketHandler.blockInf(block);
+            String tip = webSocketHandler.bcTipFromNodeId(from);
+            obj.put("tip", tip);
+
+            sendObject.put("type", "Block.A");
             sendObject.put("data", obj);
+            broadCast(gson.toJson(sendObject));
+
+            // Balnce
+            sendObject = new HashMap<>();
+            HashMap<String, Object> dataObj = new HashMap<>();
+            dataObj.put("nodeId", from);
+            dataObj.put("balance", webSocketHandler.walletsBlanace(from));
+
+            sendObject.put("type", "Node.B");
+            sendObject.put("data", dataObj);
+            broadCast(gson.toJson(sendObject));
         }
         else {
             HashMap<String, Object> obj = new HashMap<>();
             obj.put("from", from);
-            obj.put("to", from);
-            obj.put("block", Utils.byteArrayToHexString(block.getHash()));
-            sendObject.put("type", "Block.G");
-            sendObject.put("data", obj);
-        }
+            obj.put("to", to);
+            obj.put("block", Utils.toHexString(block.getHash()));
 
-        if (!sendObject.isEmpty())
+            sendObject.put("type", "Block.T");
+            sendObject.put("data", obj);
             broadCast(gson.toJson(sendObject));
+        }
     }
 }

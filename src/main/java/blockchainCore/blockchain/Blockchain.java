@@ -3,6 +3,7 @@ package blockchainCore.blockchain;
 import blockchainCore.DB.Bucket;
 import blockchainCore.DB.Db;
 import blockchainCore.blockchain.consensus.ProofOfWork;
+import blockchainCore.blockchain.event.BlockSignalHandler;
 import blockchainCore.blockchain.transaction.*;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.utils.Pair;
@@ -29,7 +30,7 @@ public class Blockchain {
         Bucket b = db.getBucket("blocks");
         pow.mine(genesisBlock);
 
-        b.put(Utils.byteArrayToHexString(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchainCore.blockchain
+        b.put(Utils.toHexString(genesisBlock.getHash()), Utils.toBytes(genesisBlock)); // put genesis block to blockchainCore.blockchain
         b.put("l", genesisBlock.getHash());
 
         this.db = db;
@@ -55,7 +56,7 @@ public class Blockchain {
     public Block mineBlock(Transaction[] transactions) {
         Bucket bucket = db.getBucket("blocks");
         byte[] lastHash = bucket.get("l");
-        Block lastBlock = Utils.toObject(bucket.get(Utils.byteArrayToHexString(lastHash)));
+        Block lastBlock = Utils.toObject(bucket.get(Utils.toHexString(lastHash)));
 
         Block newBlock = new Block(transactions, lastHash, lastBlock.getHeight()+1);
         if(!pow.mine(newBlock)) return null;
@@ -69,11 +70,11 @@ public class Blockchain {
         Bucket bucket = db.getBucket("blocks");
 
         synchronized (mutexAddBlock) {
-            if (bucket.get(Utils.byteArrayToHexString(block.getHash())) != null) return false;
+            if (bucket.get(Utils.toHexString(block.getHash())) != null) return false;
 
             // 이전 블록이 있는지 검사
-            if (block.getHeight() > 0 && bucket.get(Utils.byteArrayToHexString(block.getPrevBlockHash())) == null)  { // 고아 블록
-                orphanBlocks.put(Utils.byteArrayToHexString(block.getHash()), block);
+            if (block.getHeight() > 0 && bucket.get(Utils.toHexString(block.getPrevBlockHash())) == null)  { // 고아 블록
+                orphanBlocks.put(Utils.toHexString(block.getHash()), block);
                 return false;
             }
 
@@ -90,7 +91,7 @@ public class Blockchain {
             }
 
             // 블록 추가
-            bucket.put(Utils.byteArrayToHexString(block.getHash()), Utils.toBytes(block));
+            bucket.put(Utils.toHexString(block.getHash()), Utils.toBytes(block));
 
             ArrayList<byte[]> blockList = new ArrayList<>();
             if (bucket.get("h" + block.getHeight()) != null)
@@ -106,17 +107,18 @@ public class Blockchain {
             byte[] prevTip = tip;
             tip = block.getHash();
 
-            if (!Arrays.equals(prevTip, block.getPrevBlockHash())) { // 체인 변경
-                UTXOSet utxoSet = new UTXOSet(this);
+            UTXOSet utxoSet = new UTXOSet(this);
+            if (!Arrays.equals(prevTip, block.getPrevBlockHash()))  // 체인 변경
                 utxoSet.reIndex();
-            }
-            else if (block.getHeight() > 0) { // 체인 유지
-                UTXOSet utxoSet = new UTXOSet(this);
+            else if (block.getHeight() > 0)  // 체인 유지
                 utxoSet.update(block);
-            }
+             else
+                utxoSet.reIndex();
+
 
             lastHeight = block.getHeight();
             pow.renewLastHeight(lastHeight);
+
         }
 
         return true;
@@ -128,9 +130,9 @@ public class Blockchain {
         ArrayList<byte []> hash = new ArrayList<>();
 
         for (Block b : orphanBlocks.values()) {
-            if (bucket.get(Utils.byteArrayToHexString(b.getPrevBlockHash())) != null) {
+            if (bucket.get(Utils.toHexString(b.getPrevBlockHash())) != null) {
                 if (addBlock(b)) {
-                    orphanBlocks.remove(Utils.byteArrayToHexString(b.getHash()));
+                    orphanBlocks.remove(Utils.toHexString(b.getHash()));
                     hash.add(b.getHash());
                 }
             }
@@ -147,7 +149,7 @@ public class Blockchain {
         while(itr.hasNext()){
             Block block = itr.next();
             for( Transaction tx : block.getTransactions()) {
-                String txId = Utils.byteArrayToHexString(tx.getId());
+                String txId = Utils.toHexString(tx.getId());
 
                 OutPuts:
                 for(int i=0; i<tx.getVout().size(); i++) {
@@ -170,8 +172,8 @@ public class Blockchain {
                     for(TxInput in : tx.getVin()) {
                         if (in.usesKey(pubKeysHash)) {
                             byte[] inTxId = in.getTxId();
-                            if(spentTxOs.get(Utils.byteArrayToHexString(inTxId)) == null) spentTxOs.put(Utils.byteArrayToHexString(inTxId), new ArrayList<Integer>());
-                            spentTxOs.get(Utils.byteArrayToHexString(inTxId)).add(in.getvOut());
+                            if(spentTxOs.get(Utils.toHexString(inTxId)) == null) spentTxOs.put(Utils.toHexString(inTxId), new ArrayList<Integer>());
+                            spentTxOs.get(Utils.toHexString(inTxId)).add(in.getvOut());
                         }
                     }
                 }
@@ -195,7 +197,7 @@ public class Blockchain {
             Block block = itr.next();
 
             for(Transaction tx : block.getTransactions()) {
-                String txId = Utils.byteArrayToHexString(tx.getId());
+                String txId = Utils.toHexString(tx.getId());
 
                 TxOutputs outs = new TxOutputs();
                 for(int outIdx = 0; outIdx < tx.getVout().size(); outIdx++){
@@ -211,7 +213,7 @@ public class Blockchain {
 
                 if(!tx.isCoinBase()) {
                     for(TxInput in : tx.getVin()) {
-                        String inTxId = Utils.byteArrayToHexString(in.getTxId());
+                        String inTxId = Utils.toHexString(in.getTxId());
 
                         if (!spentTXOs.containsKey(inTxId))
                             spentTXOs.put(inTxId, new ArrayList<>());
@@ -235,7 +237,7 @@ public class Blockchain {
             if (!verifyTransaction(tx)) return false;
 
             for (TxInput vin : tx.getVin()) {
-                String txId = Utils.byteArrayToHexString(vin.getTxId());
+                String txId = Utils.toHexString(vin.getTxId());
                 if (!utxoset.containsKey(txId)) return false;
                 if (!utxoset.get(txId).getOutputs().containsKey(vin.getvOut())) return false;
             }
@@ -245,11 +247,11 @@ public class Blockchain {
 
     public Block findBlock(byte[] hash) {
         Bucket bucket = db.getBucket("blocks");
-        byte[] data = bucket.get(Utils.byteArrayToHexString(hash));
+        byte[] data = bucket.get(Utils.toHexString(hash));
 
         Block block = null;
         if (data == null)
-            block = orphanBlocks.get(Utils.byteArrayToHexString(hash));
+            block = orphanBlocks.get(Utils.toHexString(hash));
         else
             block = Utils.toObject(data);
         return block;
@@ -260,7 +262,7 @@ public class Blockchain {
         for (int i = lastHeight; i >= 0; i--) {
             ArrayList<byte[]> blocks = Utils.toObject(bucket.get("h" + i));
             for (byte[] blockHash : blocks) {
-                Block block = Utils.toObject(bucket.get(Utils.byteArrayToHexString(blockHash)));
+                Block block = Utils.toObject(bucket.get(Utils.toHexString(blockHash)));
 
                 for (Transaction tx : block.getTransactions())
                     if(Arrays.equals(tx.getId(), id)) return tx;
@@ -289,7 +291,7 @@ public class Blockchain {
             ArrayList<Integer> outs = validOutputs.get(txid);
 
             for(int out : outs) {
-                TxInput input = new TxInput(Utils.hexStringToByteArray(txid), out, wallet.getPublicKey(), null);
+                TxInput input = new TxInput(Utils.hexToBytes(txid), out, wallet.getPublicKey(), null);
                 inputs.add(input);
             }
         }
@@ -309,7 +311,7 @@ public class Blockchain {
 
         for(TxInput vin : tx.getVin()) {
             Transaction prevTx = new Transaction(findTransaction(vin.getTxId()));
-            prevTxs.put(Utils.byteArrayToHexString(prevTx.getId()), prevTx);
+            prevTxs.put(Utils.toHexString(prevTx.getId()), prevTx);
         }
 
         tx.sign(privateKey, prevTxs);
@@ -322,7 +324,7 @@ public class Blockchain {
         for(TxInput vin : tx.getVin()) {
             Transaction prevTx = findTransaction(vin.getTxId());
             if(prevTx == null) return false;
-            prevTxs.put(Utils.byteArrayToHexString(prevTx.getId()), prevTx);
+            prevTxs.put(Utils.toHexString(prevTx.getId()), prevTx);
         }
 
         return tx.Verify(prevTxs);
@@ -355,7 +357,7 @@ public class Blockchain {
         }
 
         public boolean hasNext() {
-            return db.getBucket("blocks").get(Utils.byteArrayToHexString(currentHash)) != null;
+            return db.getBucket("blocks").get(Utils.toHexString(currentHash)) != null;
         }
 
         public void remove() {
@@ -363,7 +365,7 @@ public class Blockchain {
         }
 
         public Block next() {
-            Block block = new Block(db.getBucket("blocks").get(Utils.byteArrayToHexString(currentHash)));
+            Block block = new Block(db.getBucket("blocks").get(Utils.toHexString(currentHash)));
             currentHash = block.getPrevBlockHash();
 
             return block;

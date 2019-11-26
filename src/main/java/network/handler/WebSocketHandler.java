@@ -1,4 +1,4 @@
-package network.resources.handler;
+package network.handler;
 
 import blockchainCore.BlockchainCore;
 import blockchainCore.DB.Bucket;
@@ -63,11 +63,14 @@ public class WebSocketHandler {
         String nodeId = (String)dataMap.get("nodeId");
         String from = (String)dataMap.get("from");
         String to = (String)dataMap.get("to");
-        int amount = (Integer)dataMap.get("amount");
+        int amount = ((Double)dataMap.get("amount")).intValue();
 
         bcCore.sendBTC(nodeId, from, to, amount);
     }
 
+    public String bcTipFromNodeId(String nodeId) {
+        return Utils.toHexString(bcCore.getNode(nodeId).getBlockChain().getTip());
+    }
     public HashMap<String, Object> nodeInf(String nodeId) {
         Node node = bcCore.getNode(nodeId);
         HashMap<String, Object> nodeInf = new HashMap<>();
@@ -91,14 +94,16 @@ public class WebSocketHandler {
         return walletInfs;
 
     }
-
     public HashMap<String, Object> walletInf(Wallet wallet) {
         HashMap<String, Object> walletInf = new HashMap<>();
         walletInf.put("address", wallet.getAddress());
-        walletInf.put("privateKey", Utils.byteArrayToHexString(wallet.getPrivateKey().getEncoded()));
-        walletInf.put("publickKey", Utils.byteArrayToHexString(wallet.getPublicKey().getEncoded()));
+        walletInf.put("privateKey", Utils.toHexString(wallet.getPrivateKey().getEncoded()));
+        walletInf.put("publickKey", Utils.toHexString(wallet.getPublicKey().getEncoded()));
 
         return walletInf;
+    }
+    public HashMap<String, Integer> walletsBlanace(String nodeId) {
+        return bcCore.getNode(nodeId).getBalances();
     }
 
     public ArrayList<HashMap<String, Object>> blockInfs(ArrayList<Block> blocks) {
@@ -116,8 +121,8 @@ public class WebSocketHandler {
         HashMap<String, Object> blockInf = new HashMap<>();
         blockInf.put("timestamp", block.getTimestamp());
         blockInf.put("transactions", transactionInfs(new ArrayList<Transaction>(Arrays.asList(block.getTransactions()))));
-        blockInf.put("prevBlockHash", Utils.byteArrayToHexString(block.getPrevBlockHash()));
-        blockInf.put("hash", Utils.byteArrayToHexString(block.getHash()));
+        blockInf.put("prevBlockHash", Utils.toHexString(block.getPrevBlockHash()));
+        blockInf.put("hash", Utils.toHexString(block.getHash()));
         blockInf.put("nonce", block.getNonce());
         blockInf.put("height", block.getHeight());
 
@@ -137,7 +142,7 @@ public class WebSocketHandler {
 
     public HashMap<String, Object> transactionInf(Transaction tx) {
         HashMap<String, Object> txInf = new HashMap<>();
-        txInf.put("id", Utils.byteArrayToHexString(tx.getId()));
+        txInf.put("id", Utils.toHexString(tx.getId()));
         txInf.put("transactionInput", txInputInfs(tx.getVin()));
         txInf.put("transactionOutput", txOutputInfs(tx.getVout()));
 
@@ -157,7 +162,7 @@ public class WebSocketHandler {
     public HashMap<String, Object> txOutputInf(TxOutput txOutput) {
         HashMap<String, Object> txInputInf = new HashMap<>();
         txInputInf.put("value", txOutput.getValue());
-        txInputInf.put("pubKeyHash", Utils.byteArrayToHexString(txOutput.getPublicKeyHash()));
+        txInputInf.put("pubKeyHash", Utils.toHexString(txOutput.getPublicKeyHash()));
 
         return txInputInf;
     }
@@ -174,11 +179,11 @@ public class WebSocketHandler {
 
     public HashMap<String, Object> txInputInf(TxInput txinput) {
         HashMap<String, Object> txInputInf = new HashMap<>();
-        txInputInf.put("txId", Utils.byteArrayToHexString(txinput.getTxId()));
+        txInputInf.put("txId", Utils.toHexString(txinput.getTxId()));
         txInputInf.put("outputIndex", txinput.getvOut());
         if(txinput.getPubKey() == null) txInputInf.put("pubkey", "");
-        else txInputInf.put("pubkey", Utils.byteArrayToHexString(txinput.getPubKey().getEncoded()));
-        txInputInf.put("signature", Utils.byteArrayToHexString(txinput.getSignature()));
+        else txInputInf.put("pubkey", Utils.toHexString(txinput.getPubKey().getEncoded()));
+        txInputInf.put("signature", Utils.toHexString(txinput.getSignature()));
 
         return txInputInf;
     }

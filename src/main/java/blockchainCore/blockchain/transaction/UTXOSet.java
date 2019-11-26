@@ -71,7 +71,7 @@ public class UTXOSet {
         for(Transaction tx : block.getTransactions()) {
             if(!tx.isCoinBase()) {
                 for(TxInput vin : tx.getVin()) {
-                    String txId = Utils.byteArrayToHexString(vin.getTxId());
+                    String txId = Utils.toHexString(vin.getTxId());
                     TxOutputs outs = Utils.toObject(b.get(txId));
 
                     outs.getOutputs().remove(vin.getvOut());
@@ -86,13 +86,13 @@ public class UTXOSet {
             for (int i = 0; i < vouts.size(); i++)
                 newOutputs.getOutputs().put(i, vouts.get(i));
 
-            b.put(Utils.byteArrayToHexString(tx.getId()), Utils.toBytes(newOutputs));
+            b.put(Utils.toHexString(tx.getId()), Utils.toBytes(newOutputs));
         }
 
     }
     public boolean validVin(TxInput txInput) {
         Bucket b = db.getBucket(utxoBucket);
-        byte[] temp = b.get(Utils.byteArrayToHexString(txInput.getTxId()));
+        byte[] temp = b.get(Utils.toHexString(txInput.getTxId()));
         if (temp == null) return false;
 
         TxOutputs txOutputs = Utils.toObject(temp);

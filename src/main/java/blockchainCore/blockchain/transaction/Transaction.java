@@ -53,7 +53,7 @@ public class Transaction implements Serializable {
         Transaction txCopy = trimmedCopy();
         for(int i=0; i<txCopy.getVin().size(); i++) {
             TxInput vin = txCopy.getVin().get(i);
-            Transaction prevTx = prevTxs.get(Utils.byteArrayToHexString(vin.getTxId()));
+            Transaction prevTx = prevTxs.get(Utils.toHexString(vin.getTxId()));
             byte[] digest = Utils.sha256(Utils.bytesConcat(Utils.toBytes(txCopy.Hash()), prevTx.getVout().get(vin.getvOut()).getPublicKeyHash()));
 
             Signature sig = Signature.getInstance("SHA256withECDSA");
@@ -68,7 +68,7 @@ public class Transaction implements Serializable {
         if(isCoinBase()) return true;
 
         for(TxInput vin : Vin) {
-            if(prevTxs.get(Utils.byteArrayToHexString(vin.getTxId())) == null)
+            if(prevTxs.get(Utils.toHexString(vin.getTxId())) == null)
                 new Exception("ERROR: Previous transaction is not correct").printStackTrace();
         }
 
@@ -76,7 +76,7 @@ public class Transaction implements Serializable {
 
         for(int i=0; i< Vin.size(); i++) {
             TxInput vin = Vin.get(i);
-            Transaction prevTx = prevTxs.get(Utils.byteArrayToHexString(vin.getTxId()));
+            Transaction prevTx = prevTxs.get(Utils.toHexString(vin.getTxId()));
             byte[] digest = Utils.sha256(Utils.bytesConcat(Utils.toBytes(txCopy.Hash()), prevTx.getVout().get(vin.getvOut()).getPublicKeyHash()));
 
             boolean v = false;

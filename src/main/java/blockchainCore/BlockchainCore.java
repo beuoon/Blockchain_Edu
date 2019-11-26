@@ -18,6 +18,7 @@ public class BlockchainCore {
             node.createGenesisBlock();
         else
             node.createNullBlockchain();
+        node.start();
 
         nodes.put(node.getNodeId(), node);
 
