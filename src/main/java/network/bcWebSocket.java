@@ -5,7 +5,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import blockchainCore.BlockchainCore;
+import blockchainCore.blockchain.Block;
 import blockchainCore.blockchain.Blockchain;
+import blockchainCore.blockchain.event.BlockSignalHandler;
+import blockchainCore.blockchain.event.BlockSignalListener;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.node.network.Node;
 import com.google.gson.Gson;
@@ -14,11 +17,12 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-public class bcWebSocket extends WebSocketServer {
+public class bcWebSocket extends WebSocketServer implements BlockSignalListener {
     WebSocketHandler webSocketHandler = new WebSocketHandler();
 
     public bcWebSocket(InetSocketAddress address) {
         super(address);
+        BlockSignalHandler.setListener(this);
     }
 
     @Override
@@ -63,7 +67,8 @@ public class bcWebSocket extends WebSocketServer {
             case "Send":            webSocketHandler.sendBTC(data);             break;
         }
 
-        webSocket.send(gson.toJson(sendObject));
+        if (sendObject != null)
+            webSocket.send(gson.toJson(sendObject));
 
 
 //        String node1 = webSocketHandler.bcCore.createNode();
@@ -89,5 +94,10 @@ public class bcWebSocket extends WebSocketServer {
     @Override
     public void onError(WebSocket webSocket, Exception e) {
         System.err.println("an error occurred on webSocketection " + webSocket.getRemoteSocketAddress()  + ":" + e);
+    }
+
+    @Override
+    public void onEvent(String from, String to, Block block) {
+
     }
 }

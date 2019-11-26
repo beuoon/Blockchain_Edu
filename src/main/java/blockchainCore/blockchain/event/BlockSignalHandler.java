@@ -14,17 +14,17 @@ public final class BlockSignalHandler {
 
     private static BlockSignalListener listener;
 
-    public static synchronized void setListener(String nodeId, BlockSignalListener eventListener) {
+    public static synchronized void setListener(BlockSignalListener eventListener) {
         if (listener != null)
             listener=eventListener;
     }
 
-    public static synchronized void removeListener(String nodeId) {
+    public static synchronized void removeListener() {
         listener = null;
     }
 
     public static synchronized boolean callEvent( String from, String to, Block block) {
-        return callEvent(from, to, block);
+        return callEvent(from, to, block, true);
     }
 
     public static synchronized boolean callEvent( String from, String to, Block block, boolean doAsynch) {

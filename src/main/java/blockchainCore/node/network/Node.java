@@ -47,7 +47,7 @@ public class Node extends Thread implements NetworkListener {
         useWallet(createWallet());
         this.db = new Db();
         //nodeId = Utils.sha256(Float.valueOf(new SecureRandom().nextFloat()).toString().getBytes());
-        nodeId = String.format("blockchainCore.node %d", NodeCount++);
+        nodeId = Integer.toString(NodeCount++);
         this.network = new Network(nodeId);
 
         NetworkHandler.addListener(nodeId, this);

@@ -11,6 +11,7 @@ import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.node.network.Node;
 import blockchainCore.utils.Utils;
 import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
 import network.WebAppServer;
 
 import java.util.ArrayList;
@@ -37,28 +38,28 @@ public class WebSocketHandler {
         return bcCore.getNode(nodeId).getWallet(address);
     }
     public void createConnection(Object data) {
-        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
-        String source = (String)dataMap.get("source");
-        String destination = (String)dataMap.get("destination");
+        Map<String, Object> dataMap = (LinkedTreeMap<String, Object>)data;
+        String source = (String)dataMap.get("src");
+        String destination = (String)dataMap.get("dest");
 
         bcCore.createConnection(source, destination);
     }
     public void destroyConnection(Object data) {
-        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
-        String source = (String)dataMap.get("source");
-        String destination = (String)dataMap.get("destination");
+        Map<String, Object> dataMap = (LinkedTreeMap<String, Object>)data;
+        String source = (String)dataMap.get("src");
+        String destination = (String)dataMap.get("dest");
 
         bcCore.destroyConnection(source, destination);
     }
     public void endTransmission(Object data) {
-        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
+        Map<String, Object> dataMap = (LinkedTreeMap<String, Object>)data;
         String nodeId = (String)dataMap.get("nodeId");
         String BlockHash = (String)dataMap.get("block");
 
         bcCore.endTransmission(nodeId, BlockHash);
     }
     public void sendBTC(Object data) {
-        HashMap<String, Object> dataMap = (HashMap<String, Object>)data;
+        Map<String, Object> dataMap = (LinkedTreeMap<String, Object>)data;
         String nodeId = (String)dataMap.get("nodeId");
         String from = (String)dataMap.get("from");
         String to = (String)dataMap.get("to");
