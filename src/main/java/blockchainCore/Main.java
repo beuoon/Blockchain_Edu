@@ -1,11 +1,18 @@
 package blockchainCore;
 
+import blockchainCore.blockchain.Block;
+import blockchainCore.blockchain.consensus.ProofOfWork;
 import blockchainCore.node.network.Node;
 
 import java.util.ArrayList;
 
 public class Main {
     public static void main(String[] args) {
+        /*
+        Prob. Proof Of Work
+        blockchain.consensus.ProofOfWork 파일의 mine 함수를 구현하여
+        모든 블록이 ProofOfWork.Validate 를 만족하게 하세요.
+         */
         final int NODE_NUM = 10, TX_NUM = 50;
 
         // 노드 생성
@@ -45,6 +52,22 @@ public class Main {
         }
 
         // 문제
+        boolean bClear = true;
+        Mark:
+        for (Node node : nodes) {
+            for (Block block : node.getBlockChain().getBlocks()) {
+                if (!ProofOfWork.Validate(block)) {
+                    bClear = false;
+                    break Mark;
+                }
+            }
+        }
+
+        if (bClear)
+            System.out.println("축하합니다!! 문제를 푸셨어요~~");
+        else
+            System.out.println("안타깝습니다. 좀 더 노력해봐요.");
+
 
         // 종료
         for (Node node : nodes) node.close();

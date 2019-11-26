@@ -27,7 +27,7 @@ public class Node extends Thread implements NetworkListener {
     private Wallet wallet;
 
     // Blockchain
-    private static final int BLOCK_MINE_INTERVAL = 2;
+    private static final int BLOCK_MINE_INTERVAL = 0;
     private static final int BLOCK_TX_NUM = 3;
 
     private Db db;
