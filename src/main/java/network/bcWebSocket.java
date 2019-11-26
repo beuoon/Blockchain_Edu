@@ -2,9 +2,11 @@ package network;
 
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.Map;
 
 import blockchainCore.BlockchainCore;
 import blockchainCore.blockchain.Blockchain;
+import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.node.network.Node;
 import com.google.gson.Gson;
 import network.resources.handler.WebSocketHandler;
@@ -34,25 +36,35 @@ public class bcWebSocket extends WebSocketServer {
     @Override
     public void onMessage(WebSocket webSocket, String s) {
         Gson gson = new Gson();
+        Map<String, Object> sendObject = null;
+
+        System.out.println("received message from "    + webSocket.getRemoteSocketAddress() + ": " + s);
 
         HashMap<String, Object> msg = new HashMap<>();
         msg = gson.fromJson(s, msg.getClass());
-
         String type = (String)msg.get("type");
         Object data = msg.get("data");
 
         switch (type) {
-            case "Node.C":          webSocketHandler.createNode();              break;
-            case "Node.D":          webSocketHandler.destoryNode(data);         break;
-            case "Wallet.C":        webSocketHandler.createWallet(data);        break;
+            case "Node.C":
+                String nodeId = webSocketHandler.createNode();
+                sendObject = webSocketHandler.nodeInf(nodeId);
+                break;
+            case "Node.D":
+                webSocketHandler.destoryNode(data);
+                break;
+            case "Wallet.C":
+                Wallet wallet = webSocketHandler.createWallet(data);
+                sendObject = webSocketHandler.walletInf(wallet);
+                break;
             case "Connection.C":    webSocketHandler.createConnection(data);    break;
             case "Connection.D":    webSocketHandler.destroyConnection(data);   break;
             case "Transmission.E":  webSocketHandler.endTransmission(data);     break;
             case "Send":            webSocketHandler.sendBTC(data);             break;
         }
 
+        webSocket.send(gson.toJson(sendObject));
 
-        System.out.println("received message from "    + webSocket.getRemoteSocketAddress() + ": " + s);
 
 //        String node1 = webSocketHandler.bcCore.createNode();
 //        String node2 = webSocketHandler.bcCore.createNode();

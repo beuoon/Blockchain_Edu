@@ -60,6 +60,7 @@ public class Node extends Thread implements EventListener {
     }
     public void useWallet(String address) { wallet = wallets.getWallet(address); }
     public ArrayList<String> getAddresses() { return wallets.getAddresses(); }
+    public Wallet getWallet(String address) { return wallets.getWallet(address); }
     public ArrayList<Wallet> getWallets() {
         ArrayList<Wallet> _wallets = new ArrayList<>();
         for(String address : getAddresses()) {
@@ -70,12 +71,8 @@ public class Node extends Thread implements EventListener {
     }
 
     // Genesis Block
-    public void createGenesisBlock(String address) { this.bc = new Blockchain(address, this.db); }
-
-    //임시 메소드임!
-    public void createNullBlockchain() {
-        this.bc = new Blockchain(this.db);
-    }
+    public void createGenesisBlock() { this.bc = new Blockchain(wallet.getAddress(), this.db); }
+    public void createNullBlockchain() { this.bc = new Blockchain(this.db); }
 
     public String getNodeId() {
         return nodeId;

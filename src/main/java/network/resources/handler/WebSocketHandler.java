@@ -22,18 +22,19 @@ public class WebSocketHandler {
     public BlockchainCore bcCore = new BlockchainCore();
     Gson gson = new Gson();
 
-    public void createNode() {
-        bcCore.createNode();
+    public String createNode() {
+        return bcCore.createNode();
     }
     public void destoryNode(Object data) {
         String nodeId = (String)data;
 
         bcCore.destoryNode(nodeId);
     }
-    public void createWallet(Object data) {
+    public Wallet createWallet(Object data) {
         String nodeId = (String)data;
 
-        bcCore.createWallet(nodeId);
+        String address = bcCore.createWallet(nodeId);
+        return bcCore.getNode(nodeId).getWallet(address);
     }
     public void createConnection(Object data) {
         HashMap<String, Object> dataMap = (HashMap<String, Object>)data;

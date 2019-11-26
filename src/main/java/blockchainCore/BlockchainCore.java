@@ -14,10 +14,8 @@ public class BlockchainCore {
     public synchronized String createNode() {
         Node node = new Node();
 
-        if (nodes.size() == 0) {
-            String address = node.createWallet();
-            node.createGenesisBlock(address);
-        }
+        if (nodes.size() == 0)
+            node.createGenesisBlock();
         else
             node.createNullBlockchain();
 
@@ -28,8 +26,8 @@ public class BlockchainCore {
     public synchronized void destoryNode(String nodeId) {
         nodes.remove(nodeId);
     }
-    public synchronized void createWallet(String nodeId) {
-        nodes.get(nodeId).createWallet();
+    public synchronized String createWallet(String nodeId) {
+        return nodes.get(nodeId).createWallet();
     }
     public synchronized void createConnection(String src, String dest) {
         nodes.get(src).connect(dest);
