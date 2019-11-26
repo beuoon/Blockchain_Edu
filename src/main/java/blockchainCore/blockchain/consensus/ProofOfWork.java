@@ -4,6 +4,7 @@ import blockchainCore.blockchain.Block;
 import blockchainCore.utils.Utils;
 
 import java.math.BigInteger;
+import java.util.Random;
 
 public class ProofOfWork {
     static final int targetBits = 18;
@@ -14,19 +15,11 @@ public class ProofOfWork {
     }
 
     public static void Mine(Block block) {
-        byte[] hash = new byte[0];
-        int nonce = 0;
+        int nonce = new Random().nextInt();
 
-        while(nonce < Integer.MAX_VALUE) {
-            byte[] data = prepareData(block, nonce);
-            hash = Utils.sha256(data);
-            System.out.print("\r" + Utils.toHexString(hash));
-
-            BigInteger bihash = new BigInteger(1, hash);
-            if( bihash.compareTo(target) == -1 ) break;
-            else nonce++;
-        }
-        System.out.print("\n");
+        byte[] data = prepareData(block, nonce);
+        byte[] hash = Utils.sha256(data);
+        System.out.print(Utils.toHexString(hash)+"\n");
 
         block.setHash(hash);
         block.setNonce(nonce);
