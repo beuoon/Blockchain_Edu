@@ -2,7 +2,7 @@ package blockchainCore.node.network;
 
 import blockchainCore.blockchain.Block;
 import blockchainCore.blockchain.transaction.Transaction;
-import blockchainCore.node.event.EventHandler;
+import blockchainCore.node.network.event.NetworkHandler;
 import blockchainCore.utils.Utils;
 
 import java.util.*;
@@ -106,7 +106,7 @@ public class Network {
     }
 
     private void send(String nodeId, byte[] buff) {
-        if (!EventHandler.callEvent(Network.class, mNodeId, nodeId, buff))
+        if (!NetworkHandler.callEvent(mNodeId, nodeId, buff))
             conns.remove(nodeId);
     }
 }
