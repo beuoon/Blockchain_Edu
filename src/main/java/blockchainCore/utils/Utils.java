@@ -30,7 +30,7 @@ public class Utils {
     public static byte[] bytesConcat(byte[]... bytes) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
-        for (byte b[] : bytes) {
+        for (byte[] b : bytes) {
             try {
                 outputStream.write(b);
             } catch (IOException e) {

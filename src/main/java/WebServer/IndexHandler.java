@@ -1,11 +1,9 @@
-package network;
+package WebServer;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
-import java.net.URLDecoder;
-import java.util.Map;
 
 /**
  * Single Page Application을 호출하기 위한 Handler.
@@ -15,8 +13,6 @@ public class IndexHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-
-
         File file  = new File("");
         file = new File(file.getAbsolutePath() + "/web/resources/index.html");
         BufferedReader br = new BufferedReader(new FileReader(file));

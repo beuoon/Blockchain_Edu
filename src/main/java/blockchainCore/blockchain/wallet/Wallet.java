@@ -5,7 +5,6 @@ import blockchainCore.utils.Utils;
 
 import java.security.*;
 import java.security.spec.ECGenParameterSpec;
-import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Wallet {
@@ -15,6 +14,7 @@ public class Wallet {
     private PublicKey publicKey;
 
     public Wallet() {
+        // implement me
         try {
             ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256k1");
 

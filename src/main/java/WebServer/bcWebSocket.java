@@ -1,10 +1,9 @@
-package network;
+package WebServer;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentSkipListSet;
 
 import blockchainCore.blockchain.Block;
 import blockchainCore.blockchain.event.BlockSignalHandler;
@@ -12,7 +11,7 @@ import blockchainCore.blockchain.event.BlockSignalListener;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.utils.Utils;
 import com.google.gson.Gson;
-import network.handler.WebSocketHandler;
+import WebServer.handler.WebSocketHandler;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
@@ -79,7 +78,7 @@ public class bcWebSocket extends WebSocketServer implements BlockSignalListener 
             }
             case "Connection.C":    webSocketHandler.createConnection(data);    break;
             case "Connection.D":    webSocketHandler.destroyConnection(data);   break;
-            case "Transmission.E":  webSocketHandler.endTransmission(data);     break;
+            case "Block.E":  webSocketHandler.endTransmission(data);     break;
             case "Node.S":           webSocketHandler.sendBTC(data);             break;
         }
 
@@ -128,6 +127,7 @@ public class bcWebSocket extends WebSocketServer implements BlockSignalListener 
             // Block
             Map<String, Object> obj = webSocketHandler.blockInf(block);
             String tip = webSocketHandler.bcTipFromNodeId(from);
+            obj.put("nodeId", from);
             obj.put("tip", tip);
 
             sendObject.put("type", "Block.A");

@@ -3,7 +3,6 @@ package blockchainCore.blockchain;
 import blockchainCore.DB.Bucket;
 import blockchainCore.DB.Db;
 import blockchainCore.blockchain.consensus.ProofOfWork;
-import blockchainCore.blockchain.event.BlockSignalHandler;
 import blockchainCore.blockchain.transaction.*;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.utils.Pair;
@@ -330,15 +329,16 @@ public class Blockchain {
         return tx.Verify(prevTxs);
     }
 
-    public int getLastHeight() { return lastHeight; }
     public Db getDb() { return db; }
     public byte[] getTip() { return tip; }
     public ArrayList<Block> getBlocks() {
+        Bucket b = db.getBucket("blocks");
         ArrayList<Block> blocks = new ArrayList<>();
-        Iterator<Block> itr = iterator();
-
-        while(itr.hasNext()){
-            blocks.add(itr.next());
+        for(int i=0; i<=lastHeight; i++){
+            ArrayList<byte[]> heightToBlocks = Utils.toObject(b.get("h"+i));
+            for(int j=0; j<heightToBlocks.size(); j++){
+                blocks.add(Utils.toObject(b.get(Utils.toHexString(heightToBlocks.get(j)))));
+            }
         }
 
         return blocks;

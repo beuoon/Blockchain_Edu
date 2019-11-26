@@ -1,4 +1,4 @@
-package network;
+package WebServer;
 
 import com.sun.net.httpserver.HttpServer;
 

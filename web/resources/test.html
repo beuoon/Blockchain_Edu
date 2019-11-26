@@ -16,7 +16,9 @@
 <br/>
 <!-- 결과 메시지 보여주는 창 -->
 <textarea id="messageTextArea" rows="10" cols="50"></textarea>
+<script src="./main.js"/>
 <script type="text/javascript">
+
     var webSocket = new WebSocket("ws://localhost:8887");
     var messageTextArea = document.getElementById("messageTextArea");
     webSocket.onopen = function (message) {

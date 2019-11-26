@@ -4,7 +4,6 @@ import blockchainCore.blockchain.transaction.Transaction;
 import blockchainCore.utils.Utils;
 
 import java.io.*;
-import java.util.ArrayList;
 
 public class Block implements Serializable{
 

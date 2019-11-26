@@ -1,9 +1,7 @@
-package network.handler;
+package WebServer.handler;
 
 import blockchainCore.BlockchainCore;
-import blockchainCore.DB.Bucket;
 import blockchainCore.blockchain.Block;
-import blockchainCore.blockchain.Blockchain;
 import blockchainCore.blockchain.transaction.Transaction;
 import blockchainCore.blockchain.transaction.TxInput;
 import blockchainCore.blockchain.transaction.TxOutput;
@@ -12,7 +10,6 @@ import blockchainCore.node.network.Node;
 import blockchainCore.utils.Utils;
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
-import network.WebAppServer;
 
 import java.util.ArrayList;
 import java.util.Arrays;

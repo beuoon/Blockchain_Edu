@@ -1,11 +1,7 @@
 package blockchainCore;
 
-import blockchainCore.blockchain.Block;
 import blockchainCore.node.network.Node;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockchainCore {
@@ -24,9 +20,12 @@ public class BlockchainCore {
 
         return node.getNodeId();
     }
+
     public synchronized void destoryNode(String nodeId) {
+        nodes.get(nodeId).close();
         nodes.remove(nodeId);
     }
+
     public synchronized String createWallet(String nodeId) {
         return nodes.get(nodeId).createWallet();
     }
@@ -49,4 +48,5 @@ public class BlockchainCore {
     }
 
 }
+
 
