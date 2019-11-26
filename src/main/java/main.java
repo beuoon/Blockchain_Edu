@@ -1,5 +1,5 @@
 import network.WebAppServer;
-import network.Websocket;
+import network.bcWebSocket;
 import org.java_websocket.server.WebSocketServer;
 
 import java.io.IOException;
@@ -11,7 +11,7 @@ public class main {
         System.out.println("Server On");
         server.run();
         System.out.println("Se2");
-        WebSocketServer s = new Websocket(new InetSocketAddress("localhost", 8887));
+        WebSocketServer s = new bcWebSocket(new InetSocketAddress("localhost", 8887));
         s.run();
     }
 }
