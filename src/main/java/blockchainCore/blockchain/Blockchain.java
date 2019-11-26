@@ -330,6 +330,16 @@ public class Blockchain {
     public int getLastHeight() { return lastHeight; }
     public Db getDb() { return db; }
     public byte[] getTip() { return tip; }
+    public ArrayList<Block> getBlocks() {
+        ArrayList<Block> blocks = new ArrayList<>();
+        Iterator<Block> itr = iterator();
+
+        while(itr.hasNext()){
+            blocks.add(itr.next());
+        }
+
+        return blocks;
+    }
 
     public Iterator<Block> iterator() { return iterator(tip); }
     public Iterator<Block> iterator(byte[] tip) { return new BcItr(db, tip); }

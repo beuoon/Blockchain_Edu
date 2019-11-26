@@ -39,6 +39,7 @@ public final class EventHandler {
         ExecutorService executorService = Executors.newFixedThreadPool(MAX_THREAD_POOL);
 
         EventListener listener = listeners.get(to);
+
         executorService.execute(new Runnable() {
             public void run() {
                 listener.onEvent(from, data);

@@ -32,6 +32,7 @@ public class Node extends Thread implements EventListener {
     private Db db;
     private Blockchain bc;
     private LocalTime nextMineTime = LocalTime.now();
+
     private ConcurrentHashMap<String, Transaction> txPool = new ConcurrentHashMap<>();
     private ConcurrentSkipListSet<String> invBlock = new ConcurrentSkipListSet<>(), invTx = new ConcurrentSkipListSet<>();
 
@@ -64,6 +65,15 @@ public class Node extends Thread implements EventListener {
     }
 
     public ArrayList<String> getAddresses() { return wallets.getAddresses(); }
+
+    public ArrayList<Wallet> getWallets() {
+        ArrayList<Wallet> _wallets = new ArrayList<>();
+        for(String address : getAddresses()) {
+            _wallets.add(wallets.getWallet(address));
+;        }
+
+        return _wallets;
+    }
 
     // Genesis Block
     public void createGenesisBlock(String address) { this.bc = new Blockchain(address, this.db); }
@@ -371,6 +381,13 @@ public class Node extends Thread implements EventListener {
             case Network.TYPE.ADDRESS:  handleAddress(from);          break;
         }
     }
+
+    public ArrayList<Transaction> getTxsFromTxPool() {
+        Collection col = txPool.values();
+        ArrayList<Transaction> txs = new ArrayList<>(col);
+        return txs;
+    }
+
     @Override
     public void onEvent(String from, byte[] data) {
         handleConnection(from, data);

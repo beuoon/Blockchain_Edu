@@ -63,6 +63,7 @@ public class Block implements Serializable{
     public void setNonce(int nonce) {
         this.nonce = nonce;
     }
+
     public int getHeight() {
         return height;
     }
@@ -71,13 +72,7 @@ public class Block implements Serializable{
         return transactions;
     }
 
-    public byte[] hashTransactions() {
-        ArrayList<byte[]> txHashes = new ArrayList<>();
-
-        for(Transaction tx : getTransactions()){
-            txHashes.add(Utils.toBytes(tx.Hash()));
-        }
-
-        return Utils.sha256(Utils.toBytes(txHashes));
+    public long getTimestamp() {
+        return timestamp;
     }
 }

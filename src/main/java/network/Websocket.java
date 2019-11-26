@@ -3,14 +3,19 @@ package network;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
+import blockchainCore.blockchain.Blockchain;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
 public class Websocket extends WebSocketServer {
 
+    Blockchain bc = null;
+
     public Websocket(InetSocketAddress address) {
         super(address);
+
+
     }
 
     @Override
