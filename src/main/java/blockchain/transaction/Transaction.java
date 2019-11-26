@@ -93,6 +93,11 @@ public class Transaction implements Serializable {
         }
         return true;
     }
+    public boolean validCoinbase() {
+        if (!isCoinBase()) return false;
+
+        return Vout.get(0).getValue() == subsidy;
+    }
 
     private Transaction trimmedCopy() {
         ArrayList<TxInput> inputs = new ArrayList<TxInput>();

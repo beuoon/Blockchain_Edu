@@ -35,14 +35,24 @@ public class Main {
 
         // Test
         int from = 0, to = 1;
-        while (true) {
-            nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10);
+        for (int i = 0; i < 2000; ) {
+            if (!nodes.get(from).send(nodes.get(to).getWallet().getAddress(), 10))
+                continue;
             from = to;
             to = (to + 1) % NODE_NUM;
 
-            System.out.println("입력 please");
-            if (scanner.next().equals("end"))
-                break;
+            while (true) {
+                int j;
+                for (j = 0; j < NODE_NUM; j++) {
+                    if (nodes.get(from).getBlockChain().getLastHeight() <= i)
+                        break;
+                }
+                if (j == NODE_NUM)
+                    break;
+
+                Thread.sleep(100);
+            }
+            i++;
         }
 
         nodes.get(4).close();

@@ -9,6 +9,7 @@ import node.event.EventHandler;
 import node.event.EventListener;
 import utils.Utils;
 
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -25,8 +26,12 @@ public class Node extends Thread implements EventListener {
     private Wallet wallet;
 
     // Blockchain
+    private static final int BLOCK_MINE_INTERVAL = 0;
+    private static final int BLOCK_TX_NUM = 3;
+
     private Db db;
     private Blockchain bc;
+    private LocalTime nextMineTime = LocalTime.now();
     private ConcurrentHashMap<String, Transaction> txPool = new ConcurrentHashMap<>();
     private ConcurrentSkipListSet<String> invBlock = new ConcurrentSkipListSet<>(), invTx = new ConcurrentSkipListSet<>();
 
@@ -84,6 +89,7 @@ public class Node extends Thread implements EventListener {
     public String getNodeId() {
         return nodeId;
     }
+    public Blockchain getBlockChain() { return bc; }
     public Network getNetwork() {
         return network;
     }
@@ -94,20 +100,21 @@ public class Node extends Thread implements EventListener {
     }
 
     // TEST
-    public void send(String to, int amount) {
+    public boolean send(String to, int amount) {
         UTXOSet utxoSet = new UTXOSet(bc);
         Transaction tx;
         try {
             tx = bc.newUTXOTransaction(wallet, to, amount, utxoSet);
         } catch (Exception e) {
             System.out.println(nodeId + ": " + e);
-            return ;
+            return false;
         }
 
         System.out.printf("'%s'가 '%s'에게 %d 전송\n", wallet.getAddress(), to, amount);
         txPool.put(Utils.byteArrayToHexString(tx.getId()), tx);
         for (String _nodeId : network.getConnList())
             network.sendTx(_nodeId, tx);
+        return true;
     }
 
     public void checkBalance() {
@@ -152,7 +159,7 @@ public class Node extends Thread implements EventListener {
     public void close() { bLoop = false; }
 
     private void mineBlock() {
-        if (txPool.size() < 1) return; // Tx 부족
+        if (txPool.size() < BLOCK_TX_NUM-1 && LocalTime.now().isBefore(nextMineTime)) return; // Tx 부족, 시간 필요
 
         // Transaction 준비
         ArrayList<Transaction> txList = new ArrayList<>();
@@ -188,11 +195,13 @@ public class Node extends Thread implements EventListener {
             txList.add(tx);
         }
 
-        if (txList.size() == 0) return ; // 채굴할 Tx 없음
-
+        if (txList.size() == 0) return ; // Tx 없음
         txList.add(new Transaction(wallet.getAddress(), ""));
+
         Block newBlock = bc.mineBlock(txList.toArray(new Transaction[]{}));
         if (newBlock == null) return; // 채굴 실패
+
+        nextMineTime = LocalTime.now().plusSeconds(BLOCK_MINE_INTERVAL);
 
         System.out.println(nodeId + "이 " + Utils.byteArrayToHexString(newBlock.getHash()) + " 블록을 채굴!!");
 

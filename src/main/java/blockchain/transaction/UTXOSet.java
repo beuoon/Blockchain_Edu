@@ -67,28 +67,17 @@ public class UTXOSet {
 
     public void update(Block block) {
         Bucket b = db.getBucket(utxoBucket);
-        Bucket bucket = db.getBucket("blocks");
-
-        Block blockIter = block;
-        ArrayList<Block> bloks = new ArrayList<>();
-        while (blockIter != null && blockIter.getHeight() >= 0) {
-            bloks.add(blockIter);
-            if (bucket.get(Utils.byteArrayToHexString(blockIter.getPrevBlockHash())) != null)
-                blockIter = Utils.toObject(bucket.get(Utils.byteArrayToHexString(blockIter.getPrevBlockHash())));
-            else
-                blockIter = null;
-        }
 
         for(Transaction tx : block.getTransactions()) {
             if(!tx.isCoinBase()) {
                 for(TxInput vin : tx.getVin()) {
-                    TxOutputs outs = Utils.toObject(b.get(Utils.byteArrayToHexString(vin.getTxId())));
+                    String txId = Utils.byteArrayToHexString(vin.getTxId());
+                    TxOutputs outs = Utils.toObject(b.get(txId));
 
-                    if (outs.getOutputs().containsKey(vin.getvOut()))
-                        outs.getOutputs().remove(vin.getvOut());
+                    outs.getOutputs().remove(vin.getvOut());
 
-                    if(outs.getOutputs().isEmpty()) b.delete(Utils.byteArrayToHexString(vin.getTxId()));
-                    else b.put(Utils.byteArrayToHexString(vin.getTxId()), Utils.toBytes(outs));
+                    if(outs.getOutputs().isEmpty()) b.delete(txId);
+                    else b.put(txId, Utils.toBytes(outs));
                 }
             }
 
@@ -120,6 +109,8 @@ public class UTXOSet {
         while(c.hasNext()) {
             Pair<String, byte[]> kv = c.next();
             String txId = kv.getKey();
+            if (kv.getValue() == null)
+                System.out.println("DEBUGGGGGG");
             TxOutputs outs = Utils.toObject(kv.getValue());
 
             for (Integer key : outs.getOutputs().keySet()) {

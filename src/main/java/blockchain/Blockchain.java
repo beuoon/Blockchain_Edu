@@ -226,7 +226,10 @@ public class Blockchain {
     private boolean validTransaction(Block block){ return validTransaction(block, findUTXO()); }
     private boolean validTransaction(Block block, HashMap<String, TxOutputs> utxoset) {
         for (Transaction tx : block.getTransactions()) {
-            if (tx.isCoinBase()) continue;
+            if (tx.isCoinBase()) {
+                if (!tx.validCoinbase()) return false;
+                continue;
+            }
 
             if (!verifyTransaction(tx)) return false;
 
@@ -324,6 +327,7 @@ public class Blockchain {
         return tx.Verify(prevTxs);
     }
 
+    public int getLastHeight() { return lastHeight; }
     public Db getDb() { return db; }
     public byte[] getTip() { return tip; }
 
