@@ -2,11 +2,12 @@ package blockchainCore.node.network;
 
 import blockchainCore.DB.Db;
 import blockchainCore.blockchain.*;
+import blockchainCore.blockchain.event.BlockSignalHandler;
 import blockchainCore.blockchain.transaction.*;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.blockchain.wallet.Wallets;
-import blockchainCore.node.event.EventHandler;
-import blockchainCore.node.event.EventListener;
+import blockchainCore.node.network.event.NetworkHandler;
+import blockchainCore.node.network.event.NetworkListener;
 import blockchainCore.utils.Utils;
 
 import java.time.LocalTime;
@@ -14,7 +15,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-public class Node extends Thread implements EventListener {
+public class Node extends Thread implements NetworkListener {
     private static int NodeCount = 0;
 
     private String nodeId;
@@ -49,7 +50,7 @@ public class Node extends Thread implements EventListener {
         nodeId = String.format("blockchainCore.node %d", NodeCount++);
         this.network = new Network(nodeId);
 
-        EventHandler.addListener(nodeId, this);
+        NetworkHandler.addListener(nodeId, this);
     }
 
     // Wallet
@@ -150,7 +151,7 @@ public class Node extends Thread implements EventListener {
         }
 
         network.close();
-        EventHandler.removeListener(nodeId);
+        NetworkHandler.removeListener(nodeId);
     }
     public void close() { bLoop = false; }
 
@@ -205,6 +206,8 @@ public class Node extends Thread implements EventListener {
         for (Transaction tx : newBlock.getTransactions())
             txPool.remove(Utils.byteArrayToHexString(tx.getId()));
 
+        BlockSignalHandler.callEvent(nodeId, nodeId, newBlock);
+
         // 블록 전파
         for (String _nodeId : network.getConnList())
             network.sendBlock(_nodeId, newBlock);
@@ -242,6 +245,8 @@ public class Node extends Thread implements EventListener {
     private void handleBlock(String from, byte[] data) {
         Block block = Utils.toObject(data);
         String blockHash = Utils.byteArrayToHexString(block.getHash());
+
+        BlockSignalHandler.callEvent(from, nodeId, block);
 
         invBlock.remove(blockHash);
 
@@ -384,7 +389,7 @@ public class Node extends Thread implements EventListener {
     }
 
     @Override
-    public void onEvent(String from, byte[] data) {
+    public void Listen(String from, byte[] data) {
         handleConnection(from, data);
     }
 }
