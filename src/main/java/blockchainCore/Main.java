@@ -2,39 +2,51 @@ package blockchainCore;
 
 import blockchainCore.node.network.Node;
 
+import java.util.ArrayList;
+
 public class Main {
     public static void main(String[] args) {
-        BlockchainCore bc = new BlockchainCore();
+        final int NODE_NUM = 10, TX_NUM = 50;
 
         // 노드 생성
-        String node1 = bc.createNode();
-        String node2 = bc.createNode();
+        ArrayList<Node> nodes = new ArrayList<>();
 
-        // 지갑 주소
-        String node1Address = bc.getNode(node1).getAddresses().get(0);
-        String node2Address = bc.getNode(node2).getAddresses().get(0);
+        Node newNode = new Node(); newNode.createGenesisBlock(); nodes.add(newNode);
+        for (int i = 1; i < NODE_NUM; i++) {
+            newNode = new Node();
+            newNode.createNullBlockchain();
+            nodes.add(newNode);
+        }
 
         // 노드 연결
-        bc.createConnection(node1, node2);
+        for (Node node : nodes) node.getNetwork().autoConnect(NODE_NUM / 3 * 2);
+
+        // 스레드 시작
+        for (Node node : nodes) node.start();
 
         // 거래
-        String from = node1Address, to = node2Address;
-        for (int i = 0; i < 10; i++) {
-            bc.sendBTC(node1, from, to, 20);
+        int from = 0, to = 1;
+        for (int i = 0; i < TX_NUM; i++) {
+            String fromAddress = nodes.get(from).getAddresses().get(0);
+            String toAddress = nodes.get(to).getAddresses().get(0);
 
+            nodes.get(from).send(fromAddress, toAddress, 20);
+
+            Wait:
             while (true) {
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
-                if (bc.getNode(node1).getBlockChain().getLastHeight() <= i) continue;
-                if (bc.getNode(node2).getBlockChain().getLastHeight() <= i) continue;
+                for (Node node : nodes)
+                    if (node.getBlockChain().getLastHeight() <= i) continue Wait;
                 break;
             }
 
-            String temp = to;
-            to = from;
-            from = temp;
+            from = to;
+            to = (to + 1) % NODE_NUM;
         }
 
-        // 블록 검증
-        bc.getNode(node1).getBlockChain().getDb().getBucket("blocks");
+        // 문제
+
+        // 종료
+        for (Node node : nodes) node.close();
     }
 }

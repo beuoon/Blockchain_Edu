@@ -6,7 +6,7 @@ import blockchainCore.utils.Utils;
 import java.math.BigInteger;
 
 public class ProofOfWork {
-    static final int targetBits = 0;
+    static final int targetBits = 18;
     static final BigInteger target = new BigInteger("1").shiftLeft(256-targetBits);
     private int lastHeight = -1;
 
