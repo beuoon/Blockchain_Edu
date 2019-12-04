@@ -1,6 +1,6 @@
 package blockchainCore.DB;
 
-import blockchainCore.utils.Pair;
+import javafx.util.Pair;
 
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;

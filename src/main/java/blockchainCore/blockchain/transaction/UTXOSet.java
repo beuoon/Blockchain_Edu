@@ -5,8 +5,8 @@ import blockchainCore.DB.Cursor;
 import blockchainCore.DB.Db;
 import blockchainCore.blockchain.Block;
 import blockchainCore.blockchain.Blockchain;
-import blockchainCore.utils.Pair;
 import blockchainCore.utils.Utils;
+import javafx.util.Pair;
 
 import java.util.ArrayList;
 import java.util.HashMap;

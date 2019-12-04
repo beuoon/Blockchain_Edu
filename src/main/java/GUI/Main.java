@@ -1,8 +1,8 @@
 package GUI;
 
 import java.io.File;
-import java.net.URL;
 
+import GUI.Controller.MainSceneController;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -16,8 +16,10 @@ public class Main extends Application {
 
         loader.setLocation(new File("resources/mainScene.fxml").toURL());
         Parent root = loader.load();
+        MainSceneController controller = loader.getController();
 
         primaryStage.setScene(new Scene(root));
+        primaryStage.setOnCloseRequest(e -> controller.shutdown());
         primaryStage.show();
     }
 

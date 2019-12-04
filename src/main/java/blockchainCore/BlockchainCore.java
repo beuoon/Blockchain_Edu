@@ -1,6 +1,6 @@
 package blockchainCore;
 
-import blockchainCore.node.network.Node;
+import blockchainCore.node.Node;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -20,7 +20,6 @@ public class BlockchainCore {
 
         return node.getNodeId();
     }
-
     public synchronized void destoryNode(String nodeId) {
         nodes.get(nodeId).close();
         nodes.remove(nodeId);
@@ -36,15 +35,19 @@ public class BlockchainCore {
         nodes.get(src).disconnection(dest);
         nodes.get(dest).disconnection(src);
     }
-    public synchronized void endTransmission(String nodeId, String blockHash) {
-        nodes.get(nodeId).endTransmission(blockHash);
-    }
     public synchronized void sendBTC(String nodeId, String from, String to, int amount) {
         nodes.get(nodeId).send(from, to, amount);
     }
 
     public synchronized Node getNode(String nodeId){
         return nodes.get(nodeId);
+    }
+
+    public synchronized void destroyNodeAll() {
+        synchronized (nodes) {
+            for (String nodeId : nodes.keySet())
+                destoryNode(nodeId);
+        }
     }
 
 }

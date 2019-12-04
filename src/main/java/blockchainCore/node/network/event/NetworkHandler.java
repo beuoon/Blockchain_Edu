@@ -40,11 +40,7 @@ public final class NetworkHandler {
 
         NetworkListener listener = listeners.get(to);
 
-        executorService.execute(new Runnable() {
-            public void run() {
-                listener.Listen(from, data);
-            }
-        });
+        executorService.execute(() -> listener.Listen(from, data));
         executorService.shutdown();
     }
 

@@ -26,6 +26,7 @@
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.squareup.okio:okio:1.15.0" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.slf4j:slf4j-api:1.7.25" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: net.jcip:jcip-annotations:1.0" level="project" />
+    <orderEntry type="library" name="Maven: org.openjfx:javafx:14-ea+2" level="project" />
     <orderEntry type="library" name="Maven: org.openjfx:javafx-fxml:14-ea+2" level="project" />
     <orderEntry type="library" name="Maven: org.openjfx:javafx-fxml:win:14-ea+2" level="project" />
     <orderEntry type="library" name="Maven: org.openjfx:javafx-controls:14-ea+2" level="project" />

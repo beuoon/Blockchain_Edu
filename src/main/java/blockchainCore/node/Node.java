@@ -1,13 +1,15 @@
-package blockchainCore.node.network;
+package blockchainCore.node;
 
 import blockchainCore.DB.Db;
 import blockchainCore.blockchain.*;
-import blockchainCore.blockchain.event.BlockSignalHandler;
+import blockchainCore.blockchain.event.SignalHandler;
+import blockchainCore.blockchain.event.SignalType;
 import blockchainCore.blockchain.transaction.*;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.blockchain.wallet.Wallets;
 import blockchainCore.node.network.event.NetworkHandler;
 import blockchainCore.node.network.event.NetworkListener;
+import blockchainCore.node.network.Network;
 import blockchainCore.utils.Utils;
 import org.bitcoinj.core.Base58;
 
@@ -32,13 +34,11 @@ public class Node extends Thread implements NetworkListener {
     private static final int BLOCK_TX_NUM = 3;
 
     private Db db;
-    private Blockchain bc;
+    private Blockchain bc = null;
     private LocalTime nextMineTime = LocalTime.now();
 
     private ConcurrentHashMap<String, Transaction> txPool = new ConcurrentHashMap<>();
-    private ConcurrentSkipListSet<String> invBlock = new ConcurrentSkipListSet<>(), invTx = new ConcurrentSkipListSet<>();
-
-    private ConcurrentSkipListSet<String> receivedBlocks = new ConcurrentSkipListSet<>();
+    private final ConcurrentSkipListSet<String> invBlock = new ConcurrentSkipListSet<>(), invTx = new ConcurrentSkipListSet<>();
 
     // Network
     private Network network;
@@ -140,12 +140,10 @@ public class Node extends Thread implements NetworkListener {
             if (!bMining) {
                 bMining = true;
                 bMineThreadStart = false;
-                new Thread(new Runnable() {
-                    public void run() {
-                        bMineThreadStart = true;
-                        mineBlock();
-                        bMining = false;
-                    }
+                new Thread(() -> {
+                    bMineThreadStart = true;
+                    mineBlock();
+                    bMining = false;
                 }).start();
 
                 while (!bMineThreadStart)
@@ -218,7 +216,7 @@ public class Node extends Thread implements NetworkListener {
 
         System.out.println(nodeId + "이 " + Utils.toHexString(newBlock.getHash()) + " 블록을 채굴!!");
 
-        BlockSignalHandler.callEvent(nodeId, nodeId, newBlock);
+        SignalHandler.callEvent(SignalType.ADD_BLOCK, nodeId, newBlock);
 
         // 블록내 트랜잭션 TxPool 에서 제거
         for (Transaction tx : newBlock.getTransactions())
@@ -262,19 +260,12 @@ public class Node extends Thread implements NetworkListener {
         Block block = Utils.toObject(data);
         String blockHash = Utils.toHexString(block.getHash());
 
-        BlockSignalHandler.callEvent(from, nodeId, block);
-
-        invBlock.remove(blockHash);
-
-        String blockKey = nodeId + blockHash;
-        receivedBlocks.add(blockHash);
-        while (receivedBlocks.contains(blockHash))
-            try { sleep(50L); } catch (InterruptedException ignored) {}
+        SignalHandler.callEvent(SignalType.HANDLE_BLOCK, from, nodeId, block);
 
         if (!bc.addBlock(block)) return;
         System.out.println(nodeId + "에 " + blockHash + " 블록이 추가 되었습니다.");
 
-        BlockSignalHandler.callEvent(nodeId, nodeId, block);
+        SignalHandler.callEvent(SignalType.ADD_BLOCK, nodeId, block);
 
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())
@@ -344,7 +335,7 @@ public class Node extends Thread implements NetworkListener {
                 break;
             case Network.TYPE.TX:
                 String id = Utils.toHexString(hash);
-                Transaction tx = null;
+                Transaction tx;
 
                 if (txPool.containsKey(id))
                     tx = txPool.get(id);
@@ -398,12 +389,7 @@ public class Node extends Thread implements NetworkListener {
     }
 
     public ArrayList<Transaction> getTxsFromTxPool() {
-        Collection col = txPool.values();
-        ArrayList<Transaction> txs = new ArrayList<>(col);
-        return txs;
-    }
-    public void endTransmission(String blockHash) {
-        receivedBlocks.remove(blockHash);
+        return new ArrayList<>(txPool.values());
     }
 
     @Override

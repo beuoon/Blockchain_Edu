@@ -5,8 +5,8 @@ import blockchainCore.DB.Db;
 import blockchainCore.blockchain.consensus.ProofOfWork;
 import blockchainCore.blockchain.transaction.*;
 import blockchainCore.blockchain.wallet.Wallet;
-import blockchainCore.utils.Pair;
 import blockchainCore.utils.Utils;
+import javafx.util.Pair;
 
 import java.security.*;
 import java.util.*;
@@ -272,8 +272,8 @@ public class Blockchain {
     }
 
     public Transaction newUTXOTransaction(Wallet wallet, String to, int amount, UTXOSet utxoSet) throws Exception{
-        ArrayList<TxInput> inputs = new ArrayList();
-        ArrayList<TxOutput> outputs = new ArrayList();
+        ArrayList<TxInput> inputs = new ArrayList<>();
+        ArrayList<TxOutput> outputs = new ArrayList<>();
 
         byte[] pubkeyHash = Utils.ripemd160(Utils.sha256(wallet.getPublicKey().getEncoded()));
         Pair<Integer, HashMap<String, ArrayList<Integer>>> spendableOutputs = utxoSet.findSpendableOutputs(pubkeyHash, amount);
