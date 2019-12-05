@@ -23,6 +23,7 @@ public class BlockchainCore {
     public synchronized void destoryNode(String nodeId) {
         nodes.get(nodeId).close();
         nodes.remove(nodeId);
+        // TODO: 제네시스 블록을 유일하게 갖고있는 노드가 없어질 때 예외처리
     }
 
     public synchronized String createWallet(String nodeId) {

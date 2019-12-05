@@ -6,7 +6,7 @@ import java.util.concurrent.Executors;
 
 public final class NetworkHandler {
 
-    private static final int MAX_THREAD_POOL = 5;
+    private static final int MAX_THREAD_POOL = 100;
 
     private static ConcurrentHashMap<String, NetworkListener> listeners = new ConcurrentHashMap<>();
 

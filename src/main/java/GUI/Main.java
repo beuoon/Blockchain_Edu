@@ -7,6 +7,7 @@ import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 public class Main extends Application {
@@ -14,16 +15,17 @@ public class Main extends Application {
     public void start(Stage primaryStage) throws Exception {
         FXMLLoader loader = new FXMLLoader();
 
-        loader.setLocation(new File("resources/mainScene.fxml").toURL());
+        loader.setLocation(getClass().getResource("/mainScene.fxml"));
         Parent root = loader.load();
         MainSceneController controller = loader.getController();
 
         primaryStage.setScene(new Scene(root));
+        primaryStage.setTitle("Blockchain Edu");
+        primaryStage.setResizable(false);
+        primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("/icon.png")));
         primaryStage.setOnCloseRequest(e -> controller.shutdown());
         primaryStage.show();
     }
 
-    public static void main(String[] args) {
-        Application.launch(args);
-    }
+    public static void main(String[] args) { Application.launch(args); }
 }

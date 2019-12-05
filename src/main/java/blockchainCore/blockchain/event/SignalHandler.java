@@ -13,7 +13,7 @@ public final class SignalHandler {
         listener = null;
     }
 
-    public static synchronized void callEvent(SignalType type, Object... arvg) {
+    public static void callEvent(SignalType type, Object... arvg) {
         if (listener == null) return ;
         listener.onEvent(type, arvg);
     }

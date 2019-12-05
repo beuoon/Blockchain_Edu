@@ -1,6 +1,7 @@
 package GUI.Controller;
 
 import GUI.BlockTree;
+import GUI.Canvas.NodeContext;
 import blockchainCore.BlockchainCore;
 import blockchainCore.blockchain.Block;
 import blockchainCore.blockchain.event.*;
@@ -8,6 +9,8 @@ import blockchainCore.blockchain.transaction.*;
 import blockchainCore.blockchain.wallet.Wallet;
 import blockchainCore.node.Node;
 import blockchainCore.utils.Utils;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
@@ -16,6 +19,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.TreeItemPropertyValueFactory;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
+import javafx.util.Duration;
 import javafx.util.Pair;
 
 import java.net.URL;
@@ -26,14 +30,15 @@ import java.util.concurrent.ConcurrentSkipListSet;
 public class MainSceneController implements Initializable, SignalListener {
     @FXML
     private Canvas nodeCanvas, blockCanvas;
-    private GraphicsContext nodeGC, blockGC;
+    private NodeContext nodeContext;
+    private GraphicsContext blockGC;
 
     @FXML
     private TreeTableView<Pair<String, String>> treeTableView;
 
     private final BlockchainCore bcCore = new BlockchainCore();
     private final BlockTree blockTree = new BlockTree();
-    private boolean bFrameLoop = true;
+    private Timeline frameTimeline; // Thread 사용시 간혈적으로 freeze 발생
 
     // Mouse Event
     private double clickPosX, clickPosY;
@@ -43,19 +48,12 @@ public class MainSceneController implements Initializable, SignalListener {
     private Node selectedNode = null;
     private String selectedNodeId = "";
     private ConcurrentSkipListSet<String> nodeBlocks = new ConcurrentSkipListSet<>();
+    private final Object MUTEX = new Object();
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        nodeCanvas.setOnMousePressed(this::onMousePressed);
-        nodeCanvas.setOnMouseClicked(this::onMouseClicked);
-        // nodeCanvas.setOnMouseDragged(this::onMouseEvent);
-
-        nodeGC = nodeCanvas.getGraphicsContext2D();
+        nodeContext = new NodeContext(nodeCanvas);
         blockGC = blockCanvas.getGraphicsContext2D();
-
-        SignalHandler.setListener(this);
-
-
 
         TreeTableColumn<Pair<String, String>, String> keyCol = new TreeTableColumn<>("Key");
         TreeTableColumn<Pair<String, String>, String> valueCol = new TreeTableColumn<>("Value");
@@ -67,30 +65,34 @@ public class MainSceneController implements Initializable, SignalListener {
 
         treeTableView.getColumns().addAll(keyCol, valueCol);
 
-        selectNode(bcCore.createNode());
+        // TODO: txPool에 있는 tx도 send하는 UTXO에서 처리해줘야 됨
+        // TODO: 그래야 유동적인 트랜잭션 생성이 가능함
 
-        // TODO: txPool에 있는 tx는 send하는 UTXO에서 빼야 됨
+        frameTimeline = new Timeline(
+                new KeyFrame(
+                        Duration.seconds(0),
+                        event -> { update(); draw(); }
+                ),
+                new KeyFrame(Duration.millis(100))
+        );
+        frameTimeline.setCycleCount(Timeline.INDEFINITE);
+        frameTimeline.play();
 
-        new Thread(() -> {
-            while (bFrameLoop) {
-                update();
-                draw();
-
-                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
-            }
-        }).start();
-        draw();
+        SignalHandler.setListener(this);
+        nodeCanvas.setOnMousePressed(this::onMousePressed);
+        nodeCanvas.setOnMouseClicked(this::onMouseClicked);
+        // nodeCanvas.setOnMouseDragged(this::onMouseEvent);
     }
     public void shutdown() {
-        bFrameLoop = false;
+        frameTimeline.stop();
         bcCore.destroyNodeAll();
     }
 
     private void update() {
+        nodeContext.update();
     }
     private void draw() {
-        nodeGC.setFill(Color.BLACK);
-        nodeGC.fillRect(0, 0, nodeCanvas.getWidth(), nodeCanvas.getHeight());
+        nodeContext.draw();
 
         blockGC.setFill(Color.BLUE);
         blockGC.fillRect(0, 0, blockCanvas.getWidth(), blockCanvas.getHeight());
@@ -100,47 +102,60 @@ public class MainSceneController implements Initializable, SignalListener {
     //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
     // Mouse Event
     private void onMousePressed(MouseEvent event) {
-        clickPosX = event.getScreenX();
-        clickPosY = event.getScreenY();
+        if (contextMenu.isShowing()) {
+            contextMenu.hide();
+            return ;
+        }
+
+        clickPosX = event.getX();
+        clickPosY = event.getY();
 
         switch (event.getButton()) {
             case PRIMARY:
-                if (contextMenu.isShowing()) {
-                    contextMenu.hide();
-                    break;
-                }
-
-                // TODO: call onClick of nodeCanvas
-                // TODO: set return object to clicked object
+                clickObject = nodeContext.onClick(clickPosX, clickPosY);
                 break;
             case SECONDARY:
-                // TODO: call onClick of nodeCanvas
-                // TODO: set return object to clicked object
                 break;
         }
     }
     private void onMouseClicked(MouseEvent event) {
+        double x = event.getX(), y = event.getY();
+        Object obj = nodeContext.onClick(x, y);
+
         switch (event.getButton()) {
             case PRIMARY:
-                Object obj = null; // nodeCanvas.onClick(event.getScreenX, event.getScreenY);
-                // if (obj instanceof CanvasNode)
-                // TODO: if returned object for nodeCanvas's onClick is node,
-                // TODO: if returned node equals clicked Object, change selected node to clicked node
-                // TODO: else, connect both node
+                if (obj == null) {
+                    if (clickObject == null && event.getClickCount() >= 2) // Create Node
+                        createNode(x, y);
+                }
+                else if (obj instanceof NodeContext.GNode) {
+                    if (clickObject instanceof NodeContext.GNode) {
+                        if (obj == clickObject) { // Select Node
+                            String nodeId = ((NodeContext.GNode) obj).getNodeId();
+                            selectNode(nodeId);
+                        } else { // Connect both node
+                            String src = ((NodeContext.GNode) clickObject).getNodeId();
+                            String dest = ((NodeContext.GNode) obj).getNodeId();
 
-                // TODO: if returned object for nodeCanvas's onClick is null
-                // TODO: and clicked object is null and clickCount over 2, create node
-                bcCore.createNode();
+                            if (!nodeContext.containsConnection(src, dest)) {
+                                bcCore.createConnection(src, dest);
+                                nodeContext.addConnection(src, dest);
+                            }
+                        }
+                    }
+                }
                 break;
             case SECONDARY:
-                // TODO: returned object for nodeCanvas's onClick equals clicked Object
-                // TODO: if that is node, show context menu for that
-                onContextMenuRequested(event.getScreenX(), event.getScreenY());
-                // TODO: if that is connection line, disconnect
+                if (obj instanceof NodeContext.GNode) {
+                    onContextMenuRequested(((NodeContext.GNode) obj).getNodeId(),
+                            event.getScreenX(), event.getScreenY());
+                }
+                else if (obj instanceof NodeContext.GConnection)
+                    nodeContext.removeConnection((NodeContext.GConnection)obj);
                 break;
         }
     }
-    private void onContextMenuRequested(double x, double y) {
+    private void onContextMenuRequested(String nodeId, double x, double y) {
         if (contextMenu.isShowing())
             contextMenu.hide();
 
@@ -148,12 +163,17 @@ public class MainSceneController implements Initializable, SignalListener {
         contextMenu = new ContextMenu();
 
         // create menuitems
-        MenuItem menuItem1 = new MenuItem("Delete");
-        MenuItem menuItem2 = new MenuItem("Send");
+        MenuItem nodeIdItem = new MenuItem("Node: " + nodeId);
+        MenuItem deleteItem = new MenuItem("Delete");
+        MenuItem sendItem = new MenuItem("Send");
+
+        nodeIdItem.setDisable(true);
+        deleteItem.setOnAction(event -> deleteNode(nodeId));
+        // TODO: Create Send Function
+        // sendItem.setOnAction(event -> );
 
         // add menu items to menu
-        contextMenu.getItems().add(menuItem1);
-        contextMenu.getItems().add(menuItem2);
+        contextMenu.getItems().addAll(nodeIdItem, deleteItem, sendItem);
 
         contextMenu.show(nodeCanvas, x, y);
     }
@@ -163,14 +183,18 @@ public class MainSceneController implements Initializable, SignalListener {
     @Override
     public void onEvent(SignalType type, Object... arvg) {
         switch (type) {
-            case ADD_BLOCK:     addBlock((String)arvg[0], (Block)arvg[1]);                          break;
-            case HANDLE_BLOCK:  handleBlock((String)arvg[0], (String)arvg[1], (Block)arvg[2]);      break;
-            case HANDLE_TX:     handleTx((String)arvg[0], (String)arvg[1], (Transaction) arvg[2]);  break;
+            case ADD_BLOCK:     addBlock((String)arvg[0], (Block)arvg[1]);                      break;
+            case HANDLE_BLOCK:  handleObject((String)arvg[0], (String)arvg[1], true);   break;
+            case HANDLE_TX:     handleObject((String)arvg[0], (String)arvg[1], false);  break;
         }
     }
 
+    private void createNode(double x, double y) {
+        String nodeId = bcCore.createNode();
+        nodeContext.addNode(nodeId, x, y);
+    }
     private void selectNode(String nodeId) {
-        synchronized (bcCore) {
+        synchronized (MUTEX) {
             selectedNodeId = nodeId;
             selectedNode = bcCore.getNode(selectedNodeId);
             treeTableView.setRoot(convertTreeView(selectedNode));
@@ -181,24 +205,34 @@ public class MainSceneController implements Initializable, SignalListener {
             // blockcanvas.setKnownBlock(nodeBlocks);
         }
     }
+    private void deleteNode(String nodeId) {
+        synchronized (MUTEX) {
+            if (selectedNodeId.equals(nodeId)) {
+                selectedNodeId = "";
+                selectedNode = null;
+            }
+
+            nodeContext.removeNode(nodeId);
+            bcCore.destoryNode(nodeId);
+        }
+    }
     private void addBlock(String nodeId, Block block) {
         if (!blockTree.contains(block)) {
             blockTree.put(block);
             // TODO: resetting block position of block chain canvas
         }
 
-        synchronized (bcCore) {
+        synchronized (MUTEX) {
             if (selectedNodeId.equals(nodeId)) {
                 renewalBalance();
                 nodeBlocks.add(Utils.toHexString(block.getHash()));
             }
         }
     }
-    private void handleBlock(String from, String to, Block block) {
-        // TODO: add Animation at node canvas
-    }
-    private void handleTx(String from, String to, Transaction tx) {
-        // TODO: add Animation at node canvas
+    private void handleObject(String from, String to, boolean bBlock) {
+        int id = nodeContext.addTransmission(from, to, bBlock);
+        while (nodeContext.containsTransmission(id))
+            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
     }
 
     //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
