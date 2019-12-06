@@ -228,6 +228,9 @@ public class Blockchain {
     private boolean validTransaction(Block block){ return validTransaction(block, findUTXO()); }
     private boolean validTransaction(Block block, HashMap<String, TxOutputs> utxoset) {
         for (Transaction tx : block.getTransactions()) {
+            for (TxOutput vout : tx.getVout())
+                if (vout.getValue() < 0) return false;
+
             if (tx.isCoinBase()) {
                 if (!tx.validCoinbase()) return false;
                 continue;

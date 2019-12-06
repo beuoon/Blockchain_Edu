@@ -2,6 +2,7 @@ package blockchainCore;
 
 import blockchainCore.node.Node;
 
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockchainCore {
@@ -43,6 +44,7 @@ public class BlockchainCore {
     public synchronized Node getNode(String nodeId){
         return nodes.get(nodeId);
     }
+    public synchronized ArrayList<Node> getNodes(){ return new ArrayList<>(nodes.values()); }
 
     public synchronized void destroyNodeAll() {
         synchronized (nodes) {

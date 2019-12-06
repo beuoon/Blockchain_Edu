@@ -74,7 +74,10 @@ public class Node extends Thread implements NetworkListener {
     }
 
     // Genesis Block
-    public void createGenesisBlock() { this.bc = new Blockchain(wallet.getAddress(), this.db); }
+    public void createGenesisBlock() {
+        this.bc = new Blockchain(wallet.getAddress(), this.db);
+        SignalHandler.callEvent(SignalType.ADD_BLOCK, nodeId, bc.getBlocks().get(0));
+    }
     public void createNullBlockchain() { this.bc = new Blockchain(this.db); }
 
     public String getNodeId() {
@@ -95,6 +98,8 @@ public class Node extends Thread implements NetworkListener {
 
     // TEST
     public boolean send(String from, String to, int amount) {
+        if (amount <= 0) return false;
+
         UTXOSet utxoSet = new UTXOSet(bc);
         Transaction tx;
         try {
@@ -230,7 +235,7 @@ public class Node extends Thread implements NetworkListener {
         for (String _nodeId : network.getConnList())
             network.sendBlock(_nodeId, newBlock);
     }
-    private void fetchInventory() {
+    private synchronized void fetchInventory() {
         for (String hash : invBlock.keySet()) {
             String targetNodeId = invBlock.get(hash);
             invBlock.remove(hash);
@@ -291,10 +296,8 @@ public class Node extends Thread implements NetworkListener {
 
                     String hash = Utils.toHexString(item);
 
-                    if (!invTx.contains(hash) && !txPool.containsKey(hash) && bc.findTransaction(item) == null) {
+                    if (!invTx.contains(hash) && !txPool.containsKey(hash) && bc.findTransaction(item) == null)
                         invTx.put(hash, from);
-                        network.sendGetData(from, Network.TYPE.TX, item);
-                    }
                 }
                 break;
         }

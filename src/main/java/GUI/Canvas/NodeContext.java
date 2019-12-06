@@ -213,15 +213,16 @@ public class NodeContext {
         }
         public void draw(GraphicsContext gc) {
             gc.save();
-            gc.setFill(Color.BLUE);
             gc.setStroke(Color.BLACK);
             gc.setLineWidth(BORDER_WIDTH);
 
             if (bBlock) { // Block
+                gc.setFill(Color.RED);
                 gc.fillRect(x - SIZE/2, y - SIZE/2, SIZE, SIZE);
                 gc.strokeRect(x - SIZE/2, y - SIZE/2, SIZE, SIZE);
             }
             else { // Tx
+                gc.setFill(Color.YELLOW);
                 gc.fillOval(x - RADIUS, y - RADIUS, RADIUS * 2, RADIUS * 2);
                 gc.strokeOval(x - RADIUS, y - RADIUS, RADIUS * 2, RADIUS * 2);
             }

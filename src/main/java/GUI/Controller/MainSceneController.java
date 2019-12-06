@@ -17,14 +17,14 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.TreeItemPropertyValueFactory;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 import javafx.util.Pair;
 
 import java.net.URL;
-import java.util.HashMap;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 public class MainSceneController implements Initializable, SignalListener {
@@ -41,9 +41,9 @@ public class MainSceneController implements Initializable, SignalListener {
     private Timeline frameTimeline; // Thread 사용시 간혈적으로 freeze 발생
 
     // Mouse Event
-    private double clickPosX, clickPosY;
     private Object clickObject = null;
     private ContextMenu contextMenu = new ContextMenu();
+    private SendDialog sendDialog;
 
     private Node selectedNode = null;
     private String selectedNodeId = "";
@@ -52,18 +52,15 @@ public class MainSceneController implements Initializable, SignalListener {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        SignalHandler.setListener(this);
+
         nodeContext = new NodeContext(nodeCanvas);
         blockGC = blockCanvas.getGraphicsContext2D();
+        nodeCanvas.setOnMousePressed(this::onMousePressed);
+        nodeCanvas.setOnMouseClicked(this::onMouseClicked);
 
-        TreeTableColumn<Pair<String, String>, String> keyCol = new TreeTableColumn<>("Key");
-        TreeTableColumn<Pair<String, String>, String> valueCol = new TreeTableColumn<>("Value");
-
-        keyCol.setCellValueFactory(new TreeItemPropertyValueFactory<>("key"));
-        valueCol.setCellValueFactory(new TreeItemPropertyValueFactory<>("value"));
-
-        valueCol.setMinWidth(275); valueCol.setMaxWidth(275);
-
-        treeTableView.getColumns().addAll(keyCol, valueCol);
+        treeTableView.getColumns().get(0).setCellValueFactory(new TreeItemPropertyValueFactory<>("key"));
+        treeTableView.getColumns().get(1).setCellValueFactory(new TreeItemPropertyValueFactory<>("value"));
 
         // TODO: txPool에 있는 tx도 send하는 UTXO에서 처리해줘야 됨
         // TODO: 그래야 유동적인 트랜잭션 생성이 가능함
@@ -77,11 +74,6 @@ public class MainSceneController implements Initializable, SignalListener {
         );
         frameTimeline.setCycleCount(Timeline.INDEFINITE);
         frameTimeline.play();
-
-        SignalHandler.setListener(this);
-        nodeCanvas.setOnMousePressed(this::onMousePressed);
-        nodeCanvas.setOnMouseClicked(this::onMouseClicked);
-        // nodeCanvas.setOnMouseDragged(this::onMouseEvent);
     }
     public void shutdown() {
         frameTimeline.stop();
@@ -98,7 +90,6 @@ public class MainSceneController implements Initializable, SignalListener {
         blockGC.fillRect(0, 0, blockCanvas.getWidth(), blockCanvas.getHeight());
     }
 
-
     //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
     // Mouse Event
     private void onMousePressed(MouseEvent event) {
@@ -107,16 +98,8 @@ public class MainSceneController implements Initializable, SignalListener {
             return ;
         }
 
-        clickPosX = event.getX();
-        clickPosY = event.getY();
-
-        switch (event.getButton()) {
-            case PRIMARY:
-                clickObject = nodeContext.onClick(clickPosX, clickPosY);
-                break;
-            case SECONDARY:
-                break;
-        }
+        if (event.getButton() == MouseButton.PRIMARY)
+            clickObject = nodeContext.onClick(event.getX(), event.getY());
     }
     private void onMouseClicked(MouseEvent event) {
         double x = event.getX(), y = event.getY();
@@ -166,14 +149,24 @@ public class MainSceneController implements Initializable, SignalListener {
         MenuItem nodeIdItem = new MenuItem("Node: " + nodeId);
         MenuItem deleteItem = new MenuItem("Delete");
         MenuItem sendItem = new MenuItem("Send");
+        MenuItem createWalletItem = new MenuItem("Create Wallet");
 
         nodeIdItem.setDisable(true);
         deleteItem.setOnAction(event -> deleteNode(nodeId));
-        // TODO: Create Send Function
-        // sendItem.setOnAction(event -> );
+        sendItem.setOnAction(event -> {
+            Pair<Pair<String, String>, Integer> result = sendDialog.show(nodeId, bcCore.getNodes());
+            if (result == null) return ;
+
+            String src = result.getKey().getKey();
+            String dest = result.getKey().getValue();
+            int amount = result.getValue();
+
+            bcCore.sendBTC(nodeId, src, dest, amount);
+        });
+        createWalletItem.setOnAction(event -> createWallet(nodeId));
 
         // add menu items to menu
-        contextMenu.getItems().addAll(nodeIdItem, deleteItem, sendItem);
+        contextMenu.getItems().addAll(nodeIdItem, deleteItem, sendItem, createWalletItem);
 
         contextMenu.show(nodeCanvas, x, y);
     }
@@ -194,6 +187,8 @@ public class MainSceneController implements Initializable, SignalListener {
         nodeContext.addNode(nodeId, x, y);
     }
     private void selectNode(String nodeId) {
+        if (nodeId.equals(selectedNodeId)) return ;
+
         synchronized (MUTEX) {
             selectedNodeId = nodeId;
             selectedNode = bcCore.getNode(selectedNodeId);
@@ -202,7 +197,7 @@ public class MainSceneController implements Initializable, SignalListener {
             nodeBlocks = new ConcurrentSkipListSet<>();
             for (Block block : selectedNode.getBlockChain().getBlocks())
                 nodeBlocks.add(Utils.toHexString(block.getHash()));
-            // blockcanvas.setKnownBlock(nodeBlocks);
+            // TODO: blockcanvas.setKnownBlock(nodeBlocks);
         }
     }
     private void deleteNode(String nodeId) {
@@ -214,6 +209,14 @@ public class MainSceneController implements Initializable, SignalListener {
 
             nodeContext.removeNode(nodeId);
             bcCore.destoryNode(nodeId);
+        }
+    }
+    private void createWallet(String nodeId) {
+        String address = bcCore.getNode(nodeId).createWallet();
+
+        synchronized (MUTEX) {
+            if (nodeId.equals(selectedNodeId))
+                addWallet(bcCore.getNode(nodeId).getWallet(address));
         }
     }
     private void addBlock(String nodeId, Block block) {
@@ -235,6 +238,13 @@ public class MainSceneController implements Initializable, SignalListener {
             try { Thread.sleep(100); } catch (InterruptedException ignored) {}
     }
 
+    public void setSendDialog(SendDialog sendDialog) {
+        this.sendDialog = sendDialog;
+    }
+    public interface SendDialog {
+        Pair<Pair<String, String>, Integer> show(String nodeId, ArrayList<Node> nodes);
+    }
+
     //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
     // Tree View
     private static TreeTableItem convertTreeView(Node node) {
@@ -243,9 +253,11 @@ public class MainSceneController implements Initializable, SignalListener {
         TreeTableItem nodeItem = new TreeTableItem("Node", node.getNodeId());
 
         TreeTableItem wallets = new TreeTableItem("Wallets", "");
+        wallets.setExpanded(true);
         for (Wallet wallet : node.getWallets()) {
             String address = wallet.getAddress();
             TreeTableItem walletItem = new TreeTableItem("Wallet", address);
+            walletItem.setExpanded(true);
 
             TreeTableItem walletAddress = new TreeTableItem("address", address);
             TreeTableItem walletPubKey = new TreeTableItem("publicKey", Utils.toHexString(wallet.getPublicKey().getEncoded()));
@@ -267,7 +279,6 @@ public class MainSceneController implements Initializable, SignalListener {
                 TreeTableItem vOutIndex = new TreeTableItem("pubKeyHash", Integer.toString(vin.getvOut()));
                 TreeTableItem signature = new TreeTableItem("value", Utils.toHexString(vin.getSignature()));
                 TreeTableItem pubKey = new TreeTableItem("pubKeyHash", Utils.toHexString(vin.getPubKey().getEncoded()));
-
 
                 TreeTableItem vinItem = new TreeTableItem("vIn", Integer.toString(i));
                 vinItem.getChildren().addAll(txId, vOutIndex, signature, pubKey);
@@ -308,6 +319,22 @@ public class MainSceneController implements Initializable, SignalListener {
             walletItem.getChildren().removeIf(various -> various.getValue().getKey().equals("balance"));
             walletItem.getChildren().add(new TreeTableItem("balance", balance.get(address).toString()));
         }
+    }
+    private void addWallet(Wallet wallet) {
+        HashMap<String, Integer> balance = selectedNode.getBalances();
+        TreeTableItem walletsItem = (TreeTableItem) treeTableView.getRoot().getChildren().filtered(t -> t.getValue().getKey().equals("Wallets")).get(0);
+
+        String address = wallet.getAddress();
+        TreeTableItem walletItem = new TreeTableItem("Wallet", address);
+        walletItem.setExpanded(true);
+
+        TreeTableItem walletAddress = new TreeTableItem("address", address);
+        TreeTableItem walletPubKey = new TreeTableItem("publicKey", Utils.toHexString(wallet.getPublicKey().getEncoded()));
+        TreeTableItem walletPriKey = new TreeTableItem("privateKey", Utils.toHexString(wallet.getPrivateKey().getEncoded()));
+        TreeTableItem walletBalance = new TreeTableItem("balance", balance.get(address).toString());
+
+        walletItem.getChildren().addAll(walletAddress, walletPubKey, walletPriKey, walletBalance);
+        walletsItem.getChildren().add(walletItem);
     }
 
     static class TreeTableItem extends TreeItem<Pair<String, String>> {

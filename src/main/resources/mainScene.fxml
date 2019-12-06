@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.TreeTableColumn?>
 <?import javafx.scene.control.TreeTableView?>
 <?import javafx.scene.layout.BorderPane?>
 
@@ -15,6 +16,10 @@
         <TreeTableView fx:id="treeTableView" prefHeight="500.0" prefWidth="400.0">
          <columnResizePolicy>
             <TreeTableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
-         </columnResizePolicy></TreeTableView>
+         </columnResizePolicy>
+         <columns>
+            <TreeTableColumn editable="false" text="Key" />
+            <TreeTableColumn editable="false" minWidth="265.0" maxWidth="265.0" text="Value" />
+         </columns></TreeTableView>
     </right>
 </BorderPane>
