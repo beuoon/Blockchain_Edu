@@ -31,7 +31,7 @@ public class Main extends Application {
         controller.setSendDialog(this::showSendDialog);
 
         primaryStage.setScene(new Scene(root));
-        primaryStage.setTitle("Blockchain Edu");
+        primaryStage.setTitle("Blockchain Education");
         primaryStage.setResizable(false);
         primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("/icon.png")));
         primaryStage.setOnCloseRequest(e -> controller.shutdown());

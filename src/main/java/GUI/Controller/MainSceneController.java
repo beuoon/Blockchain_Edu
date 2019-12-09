@@ -50,6 +50,8 @@ public class MainSceneController implements Initializable, SignalListener {
     private ConcurrentSkipListSet<String> nodeBlocks = new ConcurrentSkipListSet<>();
     private final Object MUTEX = new Object();
 
+    private boolean bStop = false;
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         SignalHandler.setListener(this);
@@ -77,10 +79,32 @@ public class MainSceneController implements Initializable, SignalListener {
     }
     public void shutdown() {
         frameTimeline.stop();
+        nodeContext.close();
         bcCore.destroyNodeAll();
     }
 
     private void update() {
+        if (bStop) return;
+
+        Random random = new Random();
+        ArrayList<Node> nodes = bcCore.getNodes();
+        int nodeNum = nodes.size();
+        if (random.nextInt(100) <= 4 && nodeNum >= 2) {
+            Node node1 = bcCore.getNodes().get(random.nextInt(nodeNum));
+            Node node2 = bcCore.getNodes().get(random.nextInt(nodeNum));
+
+            Wallet wallet1 = node1.getWallets().get(random.nextInt(node1.getWallets().size()));
+            Wallet wallet2 = node2.getWallets().get(random.nextInt(node2.getWallets().size()));
+
+            String src = wallet1.getAddress();
+            String dest = wallet2.getAddress();
+            if (node1.getBalances().get(src) > 0) {
+                int amount = random.nextInt(node1.getBalances().get(src));
+
+                bcCore.sendBTC(node1.getNodeId(), src, dest, amount);
+            }
+        }
+
         nodeContext.update();
     }
     private void draw() {
@@ -129,6 +153,8 @@ public class MainSceneController implements Initializable, SignalListener {
                 }
                 break;
             case SECONDARY:
+                if (obj == null)
+                    bStop = !bStop;
                 if (obj instanceof NodeContext.GNode) {
                     onContextMenuRequested(((NodeContext.GNode) obj).getNodeId(),
                             event.getScreenX(), event.getScreenY());
@@ -235,7 +261,7 @@ public class MainSceneController implements Initializable, SignalListener {
     private void handleObject(String from, String to, boolean bBlock) {
         int id = nodeContext.addTransmission(from, to, bBlock);
         while (nodeContext.containsTransmission(id))
-            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+            try { Thread.sleep(50); } catch (InterruptedException ignored) {}
     }
 
     public void setSendDialog(SendDialog sendDialog) {
@@ -275,9 +301,9 @@ public class MainSceneController implements Initializable, SignalListener {
             TreeTableItem vins = new TreeTableItem("vIn", "");
             for (int i = 0; i < tx.getVin().size(); i++) {
                 TxInput vin = tx.getVin().get(i);
-                TreeTableItem txId = new TreeTableItem("value", Utils.toHexString(vin.getTxId()));
-                TreeTableItem vOutIndex = new TreeTableItem("pubKeyHash", Integer.toString(vin.getvOut()));
-                TreeTableItem signature = new TreeTableItem("value", Utils.toHexString(vin.getSignature()));
+                TreeTableItem txId = new TreeTableItem("txId", Utils.toHexString(vin.getTxId()));
+                TreeTableItem vOutIndex = new TreeTableItem("vOut", Integer.toString(vin.getvOut()));
+                TreeTableItem signature = new TreeTableItem("signature", Utils.toHexString(vin.getSignature()));
                 TreeTableItem pubKey = new TreeTableItem("pubKeyHash", Utils.toHexString(vin.getPubKey().getEncoded()));
 
                 TreeTableItem vinItem = new TreeTableItem("vIn", Integer.toString(i));

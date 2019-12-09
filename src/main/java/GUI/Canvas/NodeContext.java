@@ -20,6 +20,11 @@ public class NodeContext {
         this.canvas = canvas;
         gc = canvas.getGraphicsContext2D();
     }
+    public void close() {
+        nodes.clear();
+        connections.clear();
+        transmissions.clear();
+    }
 
     public void update() {
         for (GTransmission gTransmission : transmissions) {
@@ -179,8 +184,9 @@ public class NodeContext {
         private static final double RADIUS = 5, SIZE = 8, BORDER_WIDTH = 1;
         private static double Speed = 5;
 
+        private static final Object MUTEXT = new Object();
         private static int Count = 0;
-        private int id = Count++;
+        private int id;
 
         private double x, y, dist;
         private double dirX, dirY, len;
@@ -188,6 +194,10 @@ public class NodeContext {
         private boolean bBlock;
 
         public GTransmission(GNode src, GNode dest, boolean bBLock) {
+            synchronized (MUTEXT) {
+                id = Count++;
+            }
+
             x = src.x; y = src.y; dist = 0;
             len = Math.sqrt(Math.pow(dest.x-src.x, 2) + Math.pow(dest.y-src.y, 2));
             dirX = (dest.x - src.x)/len; dirY = (dest.y - src.y)/len;
