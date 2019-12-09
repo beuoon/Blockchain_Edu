@@ -23,7 +23,8 @@ public class Node extends Thread implements NetworkListener {
 
     private String nodeId;
     private boolean bLoop = true;
-    private boolean bMining = false, bMineThreadStart = false;
+    private boolean bStopMine = false, bMining = false;
+    private final Object MINE_MUTEX = new Object();
 
     // Wallett
     private Wallets wallets;
@@ -141,25 +142,26 @@ public class Node extends Thread implements NetworkListener {
 
     @Override
     public void run() {
-
         while (bLoop) {
-            try { sleep(100L); } catch (InterruptedException ignored) {}
+            try {
+                sleep(100L);
+            } catch (InterruptedException ignored) {
+            }
 
             fetchInventory();
 
-            if (!bMining) {
-                bMining = true;
-                bMineThreadStart = false;
+            synchronized (MINE_MUTEX) {
+                if (!bStopMine && !bMining) {
+                    bMining = true;
+                    mineThread = new Thread(() -> {
+                        mineBlock();
 
-                mineThread = new Thread(() -> {
-                    bMineThreadStart = true;
-                    mineBlock();
-                    bMining = false;
-                });
-                mineThread.start();
-
-                while (!bMineThreadStart)
-                    try { sleep(100L); } catch (InterruptedException ignored) {}
+                        synchronized (MINE_MUTEX) {
+                            bMining = false;
+                        }
+                    });
+                    mineThread.start();
+                }
             }
 
             // 고아 블록의 이전 블록 가져오기
@@ -258,6 +260,13 @@ public class Node extends Thread implements NetworkListener {
             requestTx.add(hash);
             invTx.remove(hash);
             network.sendGetData(targetNodeId, Network.TYPE.TX, Utils.hexToBytes(hash));
+        }
+    }
+    public void switchMine() {
+        synchronized (MINE_MUTEX) {
+            bStopMine = !bStopMine;
+            if (bStopMine && bMining)
+                mineThread.interrupt();
         }
     }
 

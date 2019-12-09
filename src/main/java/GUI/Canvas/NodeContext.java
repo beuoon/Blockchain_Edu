@@ -179,6 +179,9 @@ public class NodeContext {
 
             return true;
         }
+
+        public String getSrc() { return node1.getNodeId(); }
+        public String getDest() { return node2.getNodeId(); }
     }
     public static class GTransmission {
         private static final double RADIUS = 5, SIZE = 8, BORDER_WIDTH = 1;

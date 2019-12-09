@@ -4,13 +4,14 @@
 <?import javafx.scene.control.TreeTableColumn?>
 <?import javafx.scene.control.TreeTableView?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.control.ScrollPane?>
 
 <BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="GUI.Controller.MainSceneController">
    <center>
       <Canvas fx:id="nodeCanvas" height="500.0" width="700.0" BorderPane.alignment="CENTER" />
    </center>
     <bottom>
-        <Canvas fx:id="blockCanvas" height="300.0" width="1100.0" BorderPane.alignment="CENTER" />
+        <ScrollPane fx:id="blockPane" minHeight="300.0" maxHeight="300.0" minWidth="1100.0" maxWidth="1100.0" BorderPane.alignment="CENTER" />
     </bottom>
     <right>
         <TreeTableView fx:id="treeTableView" prefHeight="500.0" prefWidth="400.0">

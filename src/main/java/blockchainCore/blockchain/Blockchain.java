@@ -117,7 +117,6 @@ public class Blockchain {
 
             lastHeight = block.getHeight();
             pow.renewLastHeight(lastHeight);
-
         }
 
         return true;

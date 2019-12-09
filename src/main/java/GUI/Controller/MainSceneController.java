@@ -1,6 +1,6 @@
 package GUI.Controller;
 
-import GUI.BlockTree;
+import GUI.Canvas.BlockShape;
 import GUI.Canvas.NodeContext;
 import blockchainCore.BlockchainCore;
 import blockchainCore.blockchain.Block;
@@ -11,15 +11,14 @@ import blockchainCore.node.Node;
 import blockchainCore.utils.Utils;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.TreeItemPropertyValueFactory;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.paint.Color;
 import javafx.util.Duration;
 import javafx.util.Pair;
 
@@ -29,15 +28,17 @@ import java.util.concurrent.ConcurrentSkipListSet;
 
 public class MainSceneController implements Initializable, SignalListener {
     @FXML
-    private Canvas nodeCanvas, blockCanvas;
+    private Canvas nodeCanvas;
     private NodeContext nodeContext;
-    private GraphicsContext blockGC;
+
+    @FXML
+    private ScrollPane blockPane;
+    private BlockShape blockShape;
 
     @FXML
     private TreeTableView<Pair<String, String>> treeTableView;
 
     private final BlockchainCore bcCore = new BlockchainCore();
-    private final BlockTree blockTree = new BlockTree();
     private Timeline frameTimeline; // Thread 사용시 간혈적으로 freeze 발생
 
     // Mouse Event
@@ -57,9 +58,10 @@ public class MainSceneController implements Initializable, SignalListener {
         SignalHandler.setListener(this);
 
         nodeContext = new NodeContext(nodeCanvas);
-        blockGC = blockCanvas.getGraphicsContext2D();
         nodeCanvas.setOnMousePressed(this::onMousePressed);
         nodeCanvas.setOnMouseClicked(this::onMouseClicked);
+
+        blockShape = new BlockShape(blockPane);
 
         treeTableView.getColumns().get(0).setCellValueFactory(new TreeItemPropertyValueFactory<>("key"));
         treeTableView.getColumns().get(1).setCellValueFactory(new TreeItemPropertyValueFactory<>("value"));
@@ -109,9 +111,6 @@ public class MainSceneController implements Initializable, SignalListener {
     }
     private void draw() {
         nodeContext.draw();
-
-        blockGC.setFill(Color.BLUE);
-        blockGC.fillRect(0, 0, blockCanvas.getWidth(), blockCanvas.getHeight());
     }
 
     //＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊//
@@ -153,14 +152,19 @@ public class MainSceneController implements Initializable, SignalListener {
                 }
                 break;
             case SECONDARY:
-                if (obj == null)
+                if (obj == null) { // Stop to send, transfer object, mine
                     bStop = !bStop;
-                if (obj instanceof NodeContext.GNode) {
+                    bcCore.switchMine();
+                }
+                else if (obj instanceof NodeContext.GNode) { // Show ContextMenu
                     onContextMenuRequested(((NodeContext.GNode) obj).getNodeId(),
                             event.getScreenX(), event.getScreenY());
                 }
-                else if (obj instanceof NodeContext.GConnection)
-                    nodeContext.removeConnection((NodeContext.GConnection)obj);
+                else if (obj instanceof NodeContext.GConnection) { // Disconnect nodes
+                    NodeContext.GConnection gConn = (NodeContext.GConnection)obj;
+                    bcCore.destroyConnection(gConn.getSrc(), gConn.getDest());
+                    nodeContext.removeConnection(gConn);
+                }
                 break;
         }
     }
@@ -223,7 +227,7 @@ public class MainSceneController implements Initializable, SignalListener {
             nodeBlocks = new ConcurrentSkipListSet<>();
             for (Block block : selectedNode.getBlockChain().getBlocks())
                 nodeBlocks.add(Utils.toHexString(block.getHash()));
-            // TODO: blockcanvas.setKnownBlock(nodeBlocks);
+            blockShape.setKnownBlock(nodeBlocks);
         }
     }
     private void deleteNode(String nodeId) {
@@ -246,10 +250,7 @@ public class MainSceneController implements Initializable, SignalListener {
         }
     }
     private void addBlock(String nodeId, Block block) {
-        if (!blockTree.contains(block)) {
-            blockTree.put(block);
-            // TODO: resetting block position of block chain canvas
-        }
+        Platform.runLater(()-> blockShape.addBlock(block));
 
         synchronized (MUTEX) {
             if (selectedNodeId.equals(nodeId)) {
@@ -258,6 +259,7 @@ public class MainSceneController implements Initializable, SignalListener {
             }
         }
     }
+    // TODO: addTx, removeTx -> rewnewalTxPool
     private void handleObject(String from, String to, boolean bBlock) {
         int id = nodeContext.addTransmission(from, to, bBlock);
         while (nodeContext.containsTransmission(id))
@@ -335,6 +337,7 @@ public class MainSceneController implements Initializable, SignalListener {
 
         return nodeItem;
     }
+    // TODO: private static TreeTableItem convertTreeView(Block block) {}
     private void renewalBalance() {
         HashMap<String, Integer> balance = selectedNode.getBalances();
         TreeTableItem walletsItem = (TreeTableItem) treeTableView.getRoot().getChildren().filtered(t -> t.getValue().getKey().equals("Wallets")).get(0);
@@ -364,7 +367,7 @@ public class MainSceneController implements Initializable, SignalListener {
     }
 
     static class TreeTableItem extends TreeItem<Pair<String, String>> {
-        public TreeTableItem(String key, String value) {
+        TreeTableItem(String key, String value) {
             super(new Pair<>(key, value));
         }
     }
