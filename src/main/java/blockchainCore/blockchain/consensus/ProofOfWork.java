@@ -21,6 +21,7 @@ public class ProofOfWork {
 
         while(nonce < Integer.MAX_VALUE) {
             // 새로운 블록이 오거나 최장길이 갱신시.
+            if (Thread.interrupted()) return false;
             if (block.getHeight() <= lastHeight) return false;
 
             byte[] data = prepareData(block, nonce);
