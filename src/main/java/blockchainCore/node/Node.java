@@ -1,5 +1,6 @@
 package blockchainCore.node;
 
+import blockchainCore.DB.Bucket;
 import blockchainCore.DB.Db;
 import blockchainCore.blockchain.*;
 import blockchainCore.blockchain.event.SignalHandler;
@@ -11,6 +12,7 @@ import blockchainCore.node.network.event.NetworkHandler;
 import blockchainCore.node.network.event.NetworkListener;
 import blockchainCore.node.network.Network;
 import blockchainCore.utils.Utils;
+import javafx.util.Pair;
 import org.bitcoinj.core.Base58;
 
 import java.time.LocalTime;
@@ -44,6 +46,7 @@ public class Node extends Thread implements NetworkListener {
     private final ConcurrentHashMap<String, String> invTx = new ConcurrentHashMap<>();
     private final ConcurrentSkipListSet<String> requestBlock = new ConcurrentSkipListSet<>();
     private final ConcurrentSkipListSet<String> requestTx = new ConcurrentSkipListSet<>();
+    private ConcurrentHashMap<String, Pair<Block, String>> orphanBlocks = new ConcurrentHashMap<>();
 
     // Network
     private Network network;
@@ -65,14 +68,25 @@ public class Node extends Thread implements NetworkListener {
         System.out.printf("wallet '%s' id created\n", address);
         return address;
     }
-    public void useWallet(String address) { wallet = wallets.getWallet(address); }
-    public ArrayList<String> getAddresses() { return wallets.getAddresses(); }
-    public Wallet getWallet(String address) { return wallets.getWallet(address); }
+
+    public void useWallet(String address) {
+        wallet = wallets.getWallet(address);
+    }
+
+    public ArrayList<String> getAddresses() {
+        return wallets.getAddresses();
+    }
+
+    public Wallet getWallet(String address) {
+        return wallets.getWallet(address);
+    }
+
     public ArrayList<Wallet> getWallets() {
         ArrayList<Wallet> _wallets = new ArrayList<>();
-        for(String address : getAddresses()) {
+        for (String address : getAddresses()) {
             _wallets.add(wallets.getWallet(address));
-;        }
+            ;
+        }
 
         return _wallets;
     }
@@ -82,20 +96,29 @@ public class Node extends Thread implements NetworkListener {
         this.bc = new Blockchain(wallet.getAddress(), this.db);
         SignalHandler.callEvent(SignalType.ADD_BLOCK, nodeId, bc.getBlocks().get(0));
     }
-    public void createNullBlockchain() { this.bc = new Blockchain(this.db); }
+
+    public void createNullBlockchain() {
+        this.bc = new Blockchain(this.db);
+    }
 
     public String getNodeId() {
         return nodeId;
     }
-    public Blockchain getBlockChain() { return bc; }
+
+    public Blockchain getBlockChain() {
+        return bc;
+    }
+
     public Network getNetwork() {
         return network;
     }
+
     public void connect(String to) {
         network.connectTo(to);
         network.sendAddress(to);
         network.sendVersion(to, bc.getTip());
     }
+
     public void disconnection(String _nodeId) {
         network.disconnectionTo(_nodeId);
     }
@@ -149,6 +172,7 @@ public class Node extends Thread implements NetworkListener {
             }
 
             fetchInventory();
+            processOrphanBlock();
 
             synchronized (MINE_MUTEX) {
                 if (!bStopMine && !bMining) {
@@ -163,35 +187,25 @@ public class Node extends Thread implements NetworkListener {
                     mineThread.start();
                 }
             }
-
-            // 고아 블록의 이전 블록 가져오기
-            ConcurrentHashMap<String, Block> orphanBlocks = bc.getOrphanBlock();
-            for (Block block : orphanBlocks.values()) {
-                String prevBlock = Utils.toHexString(block.getPrevBlockHash());
-                if (!orphanBlocks.containsKey(prevBlock) && !invBlock.containsKey(prevBlock)) {
-                    int number = new Random().nextInt(network.getConnList().size());
-                    String targetNodeId = network.getConnList().get(number);
-                    invBlock.put(prevBlock, targetNodeId);
-                }
-            }
-
-            // 고아 블록 처리 및 처리된 고아 블록 전파
-            ArrayList<byte[]> blocks = bc.addOrphanBlock();
-            for (String _nodeId : network.getConnList())
-                network.sendInv(_nodeId, Network.TYPE.BLOCK, Utils.bytesConcat(blocks.toArray(new byte[][]{})));
         }
 
         network.close();
         NetworkHandler.removeListener(nodeId);
         if (bMining && mineThread != null) {
             mineThread.interrupt();
-            try { mineThread.join(); } catch (InterruptedException ignored) { }
+            try {
+                mineThread.join();
+            } catch (InterruptedException ignored) {
+            }
         }
     }
-    public void close() { bLoop = false; }
+
+    public void close() {
+        bLoop = false;
+    }
 
     private void mineBlock() {
-        if (txPool.size() < BLOCK_TX_NUM-1 && LocalTime.now().isBefore(nextMineTime)) return; // Tx 부족, 시간 필요
+        if (txPool.size() < BLOCK_TX_NUM - 1 && LocalTime.now().isBefore(nextMineTime)) return; // Tx 부족, 시간 필요
 
         // Transaction 준비
         ArrayList<Transaction> txList = new ArrayList<>();
@@ -227,7 +241,7 @@ public class Node extends Thread implements NetworkListener {
             txList.add(tx);
         }
 
-        if (txList.size() == 0) return ; // Tx 없음
+        if (txList.size() == 0) return; // Tx 없음
         txList.add(new Transaction(wallet.getAddress(), ""));
 
         Block newBlock = bc.mineBlock(txList.toArray(new Transaction[]{}));
@@ -247,7 +261,8 @@ public class Node extends Thread implements NetworkListener {
         for (String _nodeId : network.getConnList())
             network.sendInv(_nodeId, Network.TYPE.BLOCK, newBlock.getHash());
     }
-    private synchronized void fetchInventory() {
+
+    private void fetchInventory() {
         for (String hash : invBlock.keySet()) {
             String targetNodeId = invBlock.get(hash);
             requestBlock.add(hash);
@@ -260,6 +275,42 @@ public class Node extends Thread implements NetworkListener {
             requestTx.add(hash);
             invTx.remove(hash);
             network.sendGetData(targetNodeId, Network.TYPE.TX, Utils.hexToBytes(hash));
+        }
+    }
+    private void processOrphanBlock() {
+        Bucket bucket = db.getBucket("blocks");
+        ArrayList<Block> addedBlocks = new ArrayList<>();
+
+        // 고아 블록 처리
+        for(Pair<Block, String> pair : orphanBlocks.values()) {
+            Block block = pair.getKey();
+            String from = pair.getValue();
+
+            if (bc.findBlock(block.getPrevBlockHash()) != null) { // 고아 블록 추가
+                orphanBlocks.remove(Utils.toHexString(block.getHash()));
+                if (bc.addBlock(block) > 0)
+                    addedBlocks.add(block);
+            }
+            else { // 고아 블록의 부모 블록 가져오기
+                String prevBlock = Utils.toHexString(block.getPrevBlockHash());
+                if (!orphanBlocks.containsKey(prevBlock) && bc.findBlock(block.getPrevBlockHash()) == null &&
+                        !invBlock.containsKey(prevBlock) && !requestBlock.contains(prevBlock))
+                    invBlock.put(prevBlock, from);
+            }
+        }
+
+        // 추가된 고아 블록 전파
+        for (Block block : addedBlocks) {
+            SignalHandler.callEvent(SignalType.ADD_BLOCK, nodeId, block);
+            System.out.println(nodeId + "에 " + Utils.toHexString(block.getHash()) + " 블록이 추가 되었습니다.");
+
+            // 블록내 트랜잭션 pool 에서 제거
+            for (Transaction tx : block.getTransactions())
+                txPool.remove(Utils.toHexString(tx.getId()));
+
+            // 전파
+            for (String _nodeId : network.getConnList())
+                network.sendInv(_nodeId, Network.TYPE.BLOCK, block.getHash());
         }
     }
     public void switchMine() {
@@ -281,14 +332,19 @@ public class Node extends Thread implements NetworkListener {
         SignalHandler.callEvent(SignalType.HANDLE_BLOCK, from, nodeId);
 
         try {
-            if (!bc.addBlock(block)) return;
+            int result = bc.addBlock(block);
+            if (result == -1) {
+                orphanBlocks.put(blockHash, new Pair<>(block, from));
+                return ;
+            }
+            else if (result <= 0)
+                return ;
         } finally {
             requestBlock.remove(blockHash);
         }
 
         SignalHandler.callEvent(SignalType.ADD_BLOCK, nodeId, block);
         System.out.println(nodeId + "에 " + blockHash + " 블록이 추가 되었습니다.");
-
 
         // 블록내 트랜잭션 pool 에서 제거
         for (Transaction tx : block.getTransactions())

@@ -18,7 +18,6 @@ public class Blockchain {
     private int lastHeight;
 
     private ProofOfWork pow = new ProofOfWork();
-    private ConcurrentHashMap<String, Block> orphanBlocks = new ConcurrentHashMap<>();
     private final Object mutexAddBlock = new Object();
 
     final String genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
@@ -60,33 +59,31 @@ public class Blockchain {
         Block newBlock = new Block(transactions, lastHash, lastBlock.getHeight()+1);
         if(!pow.mine(newBlock)) return null;
 
-        if (!addBlock(newBlock))
+        if (addBlock(newBlock) <= 0)
             return null;
 
         return newBlock;
     }
-    public boolean addBlock(Block block) {
+    public int addBlock(Block block) {
         Bucket bucket = db.getBucket("blocks");
 
         synchronized (mutexAddBlock) {
-            if (bucket.get(Utils.toHexString(block.getHash())) != null) return false;
+            if (bucket.get(Utils.toHexString(block.getHash())) != null) return 0;
 
             // 이전 블록이 있는지 검사
-            if (block.getHeight() > 0 && bucket.get(Utils.toHexString(block.getPrevBlockHash())) == null)  { // 고아 블록
-                orphanBlocks.put(Utils.toHexString(block.getHash()), block);
-                return false;
-            }
+            if (block.getHeight() > 0 && bucket.get(Utils.toHexString(block.getPrevBlockHash())) == null) // 고아 블록
+                return -1;
 
             // PoW 검증
-            if (!ProofOfWork.Validate(block)) return false;
+            if (!ProofOfWork.Validate(block)) return -2;
 
             // Tx 서명 및 UTXO 검증
             if (Arrays.equals(block.getPrevBlockHash(), tip)) { // 메인 체인 블록
-                if (!validTransaction(block)) return false;
+                if (!validTransaction(block)) return -3;
             }
             else { // 서브 체인 블록
                 HashMap<String, TxOutputs> utxoset = findUTXO(block.getPrevBlockHash());
-                if (!validTransaction(block, utxoset)) return false;
+                if (!validTransaction(block, utxoset)) return -4;
             }
 
             // 블록 추가
@@ -98,7 +95,7 @@ public class Blockchain {
             blockList.add(block.getHash());
             bucket.put("h" + block.getHeight(), Utils.toBytes(blockList));
 
-            if (block.getHeight() <= lastHeight) return true;
+            if (block.getHeight() <= lastHeight) return 1;
 
             // 체인 갱신
             bucket.put("l", block.getHash());
@@ -119,24 +116,7 @@ public class Blockchain {
             pow.renewLastHeight(lastHeight);
         }
 
-        return true;
-    }
-
-    public ConcurrentHashMap<String, Block> getOrphanBlock() { return orphanBlocks; }
-    public ArrayList<byte []> addOrphanBlock() {
-        Bucket bucket = db.getBucket("blocks");
-        ArrayList<byte []> hash = new ArrayList<>();
-
-        for (Block b : orphanBlocks.values()) {
-            if (bucket.get(Utils.toHexString(b.getPrevBlockHash())) != null) {
-                if (addBlock(b)) {
-                    orphanBlocks.remove(Utils.toHexString(b.getHash()));
-                    hash.add(b.getHash());
-                }
-            }
-        }
-
-        return hash;
+        return 2;
     }
 
     public ArrayList<Transaction> findUnspentTransactions(byte[] pubKeysHash) {
@@ -247,15 +227,8 @@ public class Blockchain {
     }
 
     public Block findBlock(byte[] hash) {
-        Bucket bucket = db.getBucket("blocks");
-        byte[] data = bucket.get(Utils.toHexString(hash));
-
-        Block block = null;
-        if (data == null)
-            block = orphanBlocks.get(Utils.toHexString(hash));
-        else
-            block = Utils.toObject(data);
-        return block;
+        byte[] data = db.getBucket("blocks").get(Utils.toHexString(hash));
+        return (data == null) ? null : Utils.toObject(data);
     }
     public Transaction findTransaction(byte[] id) {
         Bucket bucket = db.getBucket("blocks");

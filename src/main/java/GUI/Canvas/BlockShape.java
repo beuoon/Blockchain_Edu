@@ -10,15 +10,15 @@ import javafx.scene.shape.Rectangle;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.HashSet;
 
 public class BlockShape {
-    private static final double BLANK = 10;
+    private static final double BLANK = 10, OPACITY = 0.3;;
 
     private Pane rootPane;
 
     private final BlockTree blockTree = new BlockTree();
-    private ConcurrentSkipListSet<String> knownBlock = null; //TODO: Add Effect
+    private boolean bSelected = false; // it's flag that any node is selected.
 
     public BlockShape(ScrollPane scrollPane) {
         rootPane = new Pane();
@@ -26,12 +26,19 @@ public class BlockShape {
         scrollPane.setContent(rootPane);
     }
 
-    public void addBlock(Block block) {
-        if (!blockTree.contains(block))
-            blockTree.add(rootPane, block);
+    public synchronized void addBlock(Block block) {
+        if (!blockTree.contains(Utils.toHexString(block.getHash())))
+            blockTree.add(rootPane, block, bSelected);
     }
-    public void setKnownBlock(ConcurrentSkipListSet<String> knownBlocks) {
-        this.knownBlock = knownBlocks;
+    public synchronized void addKnownBlock(String... blocks) {
+        blockTree.addKnownBlocks(blocks);
+    }
+    public synchronized void clearKnownBlock(boolean bSelected) {
+        this.bSelected = bSelected;
+        blockTree.clearKnownBlocks(bSelected);
+    }
+    public synchronized void setTip(String blockHash) {
+        blockTree.setTip(blockHash);
     }
 
     public static class GBlock {
@@ -55,8 +62,13 @@ public class BlockShape {
         void setY(double y) {
             this.y = y;
             rect.setY(y-SIZE/2);
+        }
+        String getHash() { return Utils.toHexString(block.getHash()); }
+        String getPrevBlockHash() { return Utils.toHexString(block.getPrevBlockHash()); }
 
-            // rect.setTranslateX(100); // TODO: Add Animation
+        void setColor(Color color) { rect.setFill(color); }
+        void setOpaque(boolean bOpaque) {
+            rect.setOpacity(bOpaque ? 1 : OPACITY);
         }
     }
     public static class BlockTree {
@@ -64,14 +76,19 @@ public class BlockShape {
         private final HashMap<String, GBlock> blocks = new HashMap<>();
         private final HashMap<String, Line> lines = new HashMap<>();
 
+        private final HashSet<String> knownBlocks = new HashSet<>();
+        private String tip = null;
+
         public BlockTree() {
             tree.put("", new ArrayList<>());
         }
 
-        public synchronized void add(Pane pane, Block block) {
+        public synchronized void add(Pane pane, Block block, boolean bSelected) {
             GBlock gBlock = new GBlock(block);
-            String prevHash = Utils.toHexString(block.getPrevBlockHash());
-            String hash = Utils.toHexString(block.getHash());
+            gBlock.setOpaque(!bSelected);
+
+            String hash = gBlock.getHash();
+            String prevHash = gBlock.getPrevBlockHash();
 
             tree.get(prevHash).add(gBlock);
             tree.put(hash, new ArrayList<>());
@@ -80,6 +97,8 @@ public class BlockShape {
             if (!prevHash.equals("")) {
                 Line line = new Line();
                 line.setStrokeWidth(3);
+                line.setOpacity(bSelected ? OPACITY : 1);
+
                 lines.put(hash, line);
                 pane.getChildren().add(line);
             }
@@ -87,15 +106,11 @@ public class BlockShape {
 
             calcTreeRelativeY(gBlock);
         }
-        public ArrayList<GBlock> get(String hash) {
-            return tree.get(hash);
-        }
 
         private void calcTreeRelativeY(GBlock gBlock) {
-            while (gBlock != null) {
-                calcRelativeY(Utils.toHexString(gBlock.block.getHash()));
-                gBlock = blocks.get(Utils.toHexString(gBlock.block.getPrevBlockHash()));
-            }
+            do
+                calcRelativeY(gBlock.getHash());
+            while ((gBlock = blocks.get(gBlock.getPrevBlockHash())) != null);
 
             calcPosition("", BLANK);
         }
@@ -117,13 +132,13 @@ public class BlockShape {
                 block.ry = (child.get(0).ry + (block.h - cBlock.h) + cBlock.ry) / 2;
             }
         }
-
         private void calcPosition(String _hash, double y) {
-            for (GBlock gBlock : get(_hash)) {
-                gBlock.setY(y + gBlock.ry);
+            for (GBlock gBlock : tree.get(_hash)) {
+                gBlock.setY(y + gBlock.ry); // Block Position
 
-                String hash = Utils.toHexString(gBlock.block.getHash());
-                String prevHash = Utils.toHexString(gBlock.block.getPrevBlockHash());
+                // Line Position
+                String prevHash = gBlock.getPrevBlockHash();
+                String hash = gBlock.getHash();
                 if (!prevHash.equals("")) {
                     Line line = lines.get(hash);
                     GBlock prevBlock = blocks.get(prevHash);
@@ -135,13 +150,55 @@ public class BlockShape {
                     line.setEndY(gBlock.y);
                 }
 
-                calcPosition(hash, y);
-                y += gBlock.h + BLANK;
+                calcPosition(hash, y); // Next Block
+                y += gBlock.h + BLANK; // Next Block chain
             }
         }
 
-        public boolean contains(Block block) {
-            return blocks.containsKey(Utils.toHexString(block.getHash()));
+        public void addKnownBlocks(String... blockHash) {
+            for (String hash : blockHash) {
+                knownBlocks.add(hash);
+
+                GBlock gBlock = blocks.get(hash);
+                gBlock.setOpaque(true);
+
+                String pHash = gBlock.getPrevBlockHash();
+                if (knownBlocks.contains(pHash))
+                    lines.get(hash).setOpacity(1);
+
+                for (GBlock cBlock : tree.get(hash)) {
+                    String cHash = cBlock.getHash();
+                    if (knownBlocks.contains(cHash))
+                        lines.get(cHash).setOpacity(1);
+                }
+            }
+        }
+        public void clearKnownBlocks(boolean bSelected) {
+            for (GBlock gBlock : blocks.values())
+                gBlock.setOpaque(!bSelected);
+            for (Line line : lines.values())
+                line.setOpacity(bSelected ? OPACITY : 1);
+            knownBlocks.clear();
+        }
+        public void setTip(String tip) {
+            if (this.tip != null)
+                setChainColor(this.tip, Color.RED);
+
+            this.tip = tip;
+
+            if (this.tip != null)
+                setChainColor(this.tip, Color.GREEN);
+        }
+        private void setChainColor(String hash, Color color) {
+            while (!hash.equals("")) {
+                GBlock gBlock = blocks.get(hash);
+                gBlock.setColor(color);
+                hash = gBlock.getPrevBlockHash();
+            }
+        }
+
+        public boolean contains(String hash) {
+            return blocks.containsKey(hash);
         }
     }
 }

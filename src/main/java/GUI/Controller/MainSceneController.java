@@ -48,7 +48,6 @@ public class MainSceneController implements Initializable, SignalListener {
 
     private Node selectedNode = null;
     private String selectedNodeId = "";
-    private ConcurrentSkipListSet<String> nodeBlocks = new ConcurrentSkipListSet<>();
     private final Object MUTEX = new Object();
 
     private boolean bStop = false;
@@ -131,8 +130,12 @@ public class MainSceneController implements Initializable, SignalListener {
         switch (event.getButton()) {
             case PRIMARY:
                 if (obj == null) {
-                    if (clickObject == null && event.getClickCount() >= 2) // Create Node
-                        createNode(x, y);
+                    if (clickObject == null) {
+                        if (event.getClickCount() >= 2) // Create Node
+                            createNode(x, y);
+                        else
+                            selectNode("");
+                    }
                 }
                 else if (obj instanceof NodeContext.GNode) {
                     if (clickObject instanceof NodeContext.GNode) {
@@ -222,12 +225,22 @@ public class MainSceneController implements Initializable, SignalListener {
         synchronized (MUTEX) {
             selectedNodeId = nodeId;
             selectedNode = bcCore.getNode(selectedNodeId);
-            treeTableView.setRoot(convertTreeView(selectedNode));
+            if (selectedNode != null) {
+                treeTableView.setRoot(convertTreeView(selectedNode));
 
-            nodeBlocks = new ConcurrentSkipListSet<>();
-            for (Block block : selectedNode.getBlockChain().getBlocks())
-                nodeBlocks.add(Utils.toHexString(block.getHash()));
-            blockShape.setKnownBlock(nodeBlocks);
+                ArrayList<String> nodeBlocks = new ArrayList<>();
+                for (Block block : selectedNode.getBlockChain().getBlocks())
+                    nodeBlocks.add(Utils.toHexString(block.getHash()));
+                blockShape.clearKnownBlock(true);
+                blockShape.addKnownBlock(nodeBlocks.toArray(new String[]{}));
+
+                blockShape.setTip(Utils.toHexString(selectedNode.getBlockChain().getTip()));
+            }
+            else {
+                treeTableView.setRoot(null);
+                blockShape.clearKnownBlock(false);
+                blockShape.setTip(null);
+            }
         }
     }
     private void deleteNode(String nodeId) {
@@ -250,14 +263,17 @@ public class MainSceneController implements Initializable, SignalListener {
         }
     }
     private void addBlock(String nodeId, Block block) {
-        Platform.runLater(()-> blockShape.addBlock(block));
+        Platform.runLater(()-> {
+            blockShape.addBlock(block);
 
-        synchronized (MUTEX) {
-            if (selectedNodeId.equals(nodeId)) {
-                renewalBalance();
-                nodeBlocks.add(Utils.toHexString(block.getHash()));
+            synchronized (MUTEX) {
+                if (selectedNodeId.equals(nodeId)) {
+                    renewalBalance();
+                    blockShape.addKnownBlock(Utils.toHexString(block.getHash()));
+                    blockShape.setTip(Utils.toHexString(selectedNode.getBlockChain().getTip()));
+                }
             }
-        }
+        });
     }
     // TODO: addTx, removeTx -> rewnewalTxPool
     private void handleObject(String from, String to, boolean bBlock) {
